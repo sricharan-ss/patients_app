@@ -1,5 +1,5 @@
 # patient
-
+Recent changes - 3/4/26 - Crosschecked the other pages working. Included float of icons in landing. Corrected spelling mistakes in 2 pages. Note that in the Figma design, some of the words in RHS are cut and incomplete. Added settings, FAQ, Theme pages. Added the list of clicking see all or search button must lead to the list of all hospitals/doctors.
 A new Flutter project.
 
 ## Getting Started

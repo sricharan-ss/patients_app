@@ -2,7 +2,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/app_colors.dart';
-import 'phone_input_screen.dart';
 
 class LandingPage extends StatelessWidget {
   const LandingPage({super.key});
@@ -50,7 +49,7 @@ class LandingPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   const Text(
-                    'Your health, digitally organize',
+                    'Your health, digitally organized',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: AppColors.cream,
@@ -123,60 +122,108 @@ class LandingPage extends StatelessWidget {
   }
 }
 
-class _FeatureIconsCluster extends StatelessWidget {
+class _FeatureIconsCluster extends StatefulWidget {
   const _FeatureIconsCluster();
 
   @override
+  State<_FeatureIconsCluster> createState() => _FeatureIconsClusterState();
+}
+
+class _FeatureIconsClusterState extends State<_FeatureIconsCluster> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  static const _phases = [0.0, 1.7, 3.4, 5.1];
+  static const _phaseOffsets = [0.8, 2.1, 1.2, 2.7];
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 10),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Offset _floatingOffset(double t, int i) {
+    final dx = math.sin(t + _phases[i]) * 6;
+    final dy = math.cos((t * 0.9) + _phaseOffsets[i]) * 5;
+    return Offset(dx, dy);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 165,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          const Positioned(
-            left: 30,
-            top: 0,
-            child: _IconBadge(
-              icon: Icons.health_and_safety_outlined,
-              color: AppColors.cream,
-              size: 56,
-            ),
-          ),
-          Positioned(
-            right: 32,
-            top: 2,
-            child: Transform.rotate(
-              angle: math.pi / 12,
-              child: const _IconBadge(
-                icon: Icons.medical_services_outlined,
-                color: AppColors.accent,
-                size: 54,
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final t = _controller.value * 2 * math.pi;
+        return SizedBox(
+          height: 165,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(
+                left: 30,
+                top: 0,
+                child: Transform.translate(
+                  offset: _floatingOffset(t, 0),
+                  child: _IconBadge(
+                    icon: Icons.health_and_safety_outlined,
+                    color: AppColors.cream,
+                    size: 56,
+                  ),
+                ),
               ),
-            ),
-          ),
-          const Positioned(
-            left: 16,
-            bottom: 3,
-            child: _IconBadge(
-              icon: Icons.notification_important_outlined,
-              color: AppColors.surface,
-              size: 47,
-            ),
-          ),
-          Positioned(
-            right: 38,
-            bottom: 0,
-            child: Transform.rotate(
-              angle: -math.pi / 13,
-              child: const _IconBadge(
-                icon: Icons.monitor_heart_outlined,
-                color: AppColors.brownLight,
-                size: 48,
+              Positioned(
+                right: 32,
+                top: 2,
+                child: Transform.translate(
+                  offset: _floatingOffset(t, 1),
+                  child: Transform.rotate(
+                    angle: math.pi / 12,
+                    child: _IconBadge(
+                      icon: Icons.medical_services_outlined,
+                      color: AppColors.accent,
+                      size: 54,
+                    ),
+                  ),
+                ),
               ),
-            ),
+              Positioned(
+                left: 16,
+                bottom: 3,
+                child: Transform.translate(
+                  offset: _floatingOffset(t, 2),
+                  child: _IconBadge(
+                    icon: Icons.notification_important_outlined,
+                    color: AppColors.surface,
+                    size: 47,
+                  ),
+                ),
+              ),
+              Positioned(
+                right: 38,
+                bottom: 0,
+                child: Transform.translate(
+                  offset: _floatingOffset(t, 3),
+                  child: Transform.rotate(
+                    angle: -math.pi / 13,
+                    child: _IconBadge(
+                      icon: Icons.monitor_heart_outlined,
+                      color: AppColors.brownLight,
+                      size: 48,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

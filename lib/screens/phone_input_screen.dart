@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../core/app_colors.dart';
 import '../widgets/auth_header.dart';
 
@@ -35,6 +36,7 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
       setState(() {
         _errorMessage = null;
       });
+      SystemSound.play(SystemSoundType.alert);
       Navigator.pushNamed(
         context,
         '/otp-verification',

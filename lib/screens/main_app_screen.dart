@@ -46,14 +46,14 @@ class _HomeTab extends StatelessWidget {
         children: [
           const _HomeHeader(),
           const SizedBox(height: 24),
-          const Padding(
+          Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _SectionHeader(title: 'Your Appointments', onSeeAll: null),
-                SizedBox(height: 12),
-                _AppointmentCard(
+                const _SectionHeader(title: 'Your Appointments', onSeeAll: null),
+                const SizedBox(height: 12),
+                const _AppointmentCard(
                   doctorName: 'Dr. Emily Martinez',
                   specialty: 'Cardiologist',
                   hospital: 'City General Hospital',
@@ -62,8 +62,8 @@ class _HomeTab extends StatelessWidget {
                   status: 'Confirmed',
                   statusColor: Color(0xFF2E7D32),
                 ),
-                SizedBox(height: 12),
-                _AppointmentCard(
+                const SizedBox(height: 12),
+                const _AppointmentCard(
                   doctorName: 'Dr. James Wilson',
                   specialty: 'Endocrinologist',
                   hospital: 'Metro Health Center',
@@ -72,15 +72,47 @@ class _HomeTab extends StatelessWidget {
                   status: 'Pending',
                   statusColor: AppColors.accent,
                 ),
-                SizedBox(height: 24),
-                _SectionHeader(title: 'Hospitals on VITADATA', onSeeAll: null),
-                SizedBox(height: 12),
+                const SizedBox(height: 24),
+                _SectionHeader(
+                  title: 'Hospitals on VITADATA',
+                  onSeeAll: () => Navigator.pushNamed(context, '/hospital-list'),
+                ),
+                const SizedBox(height: 12),
               ],
             ),
           ),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
             child: _HospitalGrid(),
+          ),
+          const SizedBox(height: 20),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: _SectionHeader(
+              title: 'AI Recommended Doctors',
+              onSeeAll: () => Navigator.pushNamed(context, '/doctor-list'),
+            ),
+          ),
+          const SizedBox(height: 10),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              children: [
+                _DoctorPreviewCard(
+                  name: 'Dr. Emily Martinez',
+                  specialty: 'Cardiologist',
+                  hospital: 'City General Hospital',
+                  aiPick: true,
+                ),
+                SizedBox(height: 10),
+                _DoctorPreviewCard(
+                  name: 'Dr. Sarah Chen',
+                  specialty: 'General Physician',
+                  hospital: 'Sunrise Medical',
+                  aiPick: true,
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 24),
           const Padding(
@@ -143,7 +175,14 @@ class _HomeHeader extends StatelessWidget {
                     ),
                   ),
                   const Spacer(),
-                  Icon(Icons.settings_outlined, color: AppColors.cream, size: 26),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(18),
+                    onTap: () => Navigator.pushNamed(context, '/settings'),
+                    child: const Padding(
+                      padding: EdgeInsets.all(4),
+                      child: Icon(Icons.settings_outlined, color: AppColors.cream, size: 26),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
@@ -196,18 +235,23 @@ class _HomeHeader extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               // Search bar
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.95),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const TextField(
-                  decoration: InputDecoration(
-                    hintText: 'Search doctors, hospitals...',
-                    hintStyle: TextStyle(color: Colors.black38, fontSize: 15),
-                    prefixIcon: Icon(Icons.search, color: Colors.black38),
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(vertical: 14),
+              GestureDetector(
+                onTap: () => Navigator.pushNamed(context, '/search-results'),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.95),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const IgnorePointer(
+                    child: TextField(
+                      decoration: InputDecoration(
+                        hintText: 'Search doctors, hospitals...',
+                        hintStyle: TextStyle(color: Colors.black38, fontSize: 15),
+                        prefixIcon: Icon(Icons.search, color: Colors.black38),
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(vertical: 14),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -486,6 +530,94 @@ class _HospitalCard extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────
 // Medication Card
 // ─────────────────────────────────────────────────────────────
+class _DoctorPreviewCard extends StatelessWidget {
+  const _DoctorPreviewCard({
+    required this.name,
+    required this.specialty,
+    required this.hospital,
+    required this.aiPick,
+  });
+
+  final String name;
+  final String specialty;
+  final String hospital;
+  final bool aiPick;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.surface),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: const BoxDecoration(
+              color: AppColors.accent,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: const TextStyle(
+                    color: AppColors.brownDeep,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  specialty,
+                  style: const TextStyle(
+                    color: AppColors.brownMid,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  hospital,
+                  style: const TextStyle(
+                    color: AppColors.brownLight,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (aiPick)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1E7FF),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Text(
+                'AI Pick',
+                style: TextStyle(
+                  color: Color(0xFF8F3AF8),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class _MedicationCard extends StatelessWidget {
   const _MedicationCard();
 

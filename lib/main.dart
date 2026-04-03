@@ -6,6 +6,12 @@ import 'screens/phone_input_screen.dart';
 import 'screens/otp_verification_screen.dart';
 import 'screens/profile_setup_screen.dart';
 import 'screens/main_app_screen.dart';
+import 'screens/settings_screen.dart';
+import 'screens/appearance_screen.dart';
+import 'screens/faq_screen.dart';
+import 'screens/hospital_list_screen.dart';
+import 'screens/doctor_list_screen.dart';
+import 'screens/search_results_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,6 +37,12 @@ class VitaDataApp extends StatelessWidget {
         '/otp-verification': (context) => const OTPVerificationScreen(),
         '/profile-setup': (context) => const ProfileSetupScreen(),
         '/main-app': (context) => const MainAppScreen(),
+        '/settings': (context) => const SettingsScreen(),
+        '/appearance': (context) => const AppearanceScreen(),
+        '/faqs': (context) => const FAQScreen(),
+        '/hospital-list': (context) => const HospitalListScreen(),
+        '/doctor-list': (context) => const DoctorListScreen(),
+        '/search-results': (context) => const SearchResultsScreen(),
       },
     );
   }
