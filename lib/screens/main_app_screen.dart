@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
+import '../screens/hospital_detail_screen.dart';
 
 class MainAppScreen extends StatefulWidget {
   const MainAppScreen({super.key});
@@ -424,16 +425,26 @@ class _HospitalGrid extends StatelessWidget {
         crossAxisCount: 2,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
-        childAspectRatio: 0.78,
+        mainAxisExtent: 145,
       ),
       itemBuilder: (context, index) {
         final h = _hospitals[index];
-        return _HospitalCard(
-          name: h['name'] as String,
-          location: h['location'] as String,
-          distance: h['dist'] as String,
-          rating: h['rating'] as String,
-          tags: h['tags'] as List<String>,
+        return GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => HospitalDetailScreen(hospitalName: h['name'] as String),
+              ),
+            );
+          },
+          child: _HospitalCard(
+            name: h['name'] as String,
+            location: h['location'] as String,
+            distance: h['dist'] as String,
+            rating: h['rating'] as String,
+            tags: h['tags'] as List<String>,
+          ),
         );
       },
     );
@@ -460,7 +471,7 @@ class _HospitalCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.cream,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.surface),
       ),
@@ -475,23 +486,39 @@ class _HospitalCard extends StatelessWidget {
                   name,
                   style: const TextStyle(
                     color: AppColors.brownDeep,
-                    fontSize: 13,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  '✓',
+                  style: TextStyle(
+                    color: AppColors.accent,
+                    fontSize: 10,
                     fontWeight: FontWeight.w700,
-                    height: 1.3,
                   ),
                 ),
               ),
-              const Icon(Icons.check_circle_outline, color: AppColors.accent, size: 16),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Row(
             children: [
               const Icon(Icons.location_on_outlined, color: AppColors.brownMid, size: 12),
-              const SizedBox(width: 2),
+              const SizedBox(width: 4),
               Expanded(
                 child: Text(
-                  '$location · $distance',
+                  '$location • $distance',
                   style: const TextStyle(color: AppColors.brownMid, fontSize: 11),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -501,25 +528,29 @@ class _HospitalCard extends StatelessWidget {
           const SizedBox(height: 6),
           Row(
             children: [
-              const Icon(Icons.star, color: AppColors.accent, size: 14),
+              const Icon(Icons.star, color: AppColors.accent, size: 12),
               const SizedBox(width: 4),
-              Text(rating, style: const TextStyle(color: AppColors.brownDeep, fontSize: 13, fontWeight: FontWeight.w600)),
+              Text(
+                rating, 
+                style: const TextStyle(color: AppColors.brownDeep, fontSize: 11, fontWeight: FontWeight.w600),
+              ),
             ],
           ),
           const SizedBox(height: 8),
           Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: tags
-                .map((tag) => Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.cream,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(tag, style: const TextStyle(color: AppColors.brownMid, fontSize: 10, fontWeight: FontWeight.w600)),
-                    ))
-                .toList(),
+            spacing: 4,
+            runSpacing: 4,
+            children: tags.take(2).map((tag) => Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                tag,
+                style: const TextStyle(color: AppColors.brownMid, fontSize: 9, fontWeight: FontWeight.w500),
+              ),
+            )).toList(),
           ),
         ],
       ),
