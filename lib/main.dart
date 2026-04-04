@@ -31,18 +31,41 @@ class VitaDataApp extends StatelessWidget {
       title: 'VITADATA',
       theme: AppTheme.lightTheme,
       initialRoute: '/',
-      routes: {
-        '/': (context) => const LandingPage(),
-        '/phone-input': (context) => const PhoneInputScreen(),
-        '/otp-verification': (context) => const OTPVerificationScreen(),
-        '/profile-setup': (context) => const ProfileSetupScreen(),
-        '/main-app': (context) => const MainAppScreen(),
-        '/settings': (context) => const SettingsScreen(),
-        '/appearance': (context) => const AppearanceScreen(),
-        '/faqs': (context) => const FAQScreen(),
-        '/hospital-list': (context) => const HospitalListScreen(),
-        '/doctor-list': (context) => const DoctorListScreen(),
-        '/search-results': (context) => const SearchResultsScreen(),
+      onGenerateRoute: (settings) {
+        switch (settings.name) {
+          case '/':
+            return MaterialPageRoute(builder: (_) => const LandingPage());
+          case '/phone-input':
+            return MaterialPageRoute(builder: (_) => const PhoneInputScreen());
+          case '/otp-verification':
+            return MaterialPageRoute(builder: (_) => const OTPVerificationScreen());
+          case '/profile-setup':
+            return MaterialPageRoute(builder: (_) => const ProfileSetupScreen());
+          case '/main-app':
+            return MaterialPageRoute(builder: (_) => const MainAppScreen());
+          case '/settings':
+            return MaterialPageRoute(builder: (_) => const SettingsScreen());
+          case '/appearance':
+            return MaterialPageRoute(builder: (_) => const AppearanceScreen());
+          case '/faqs':
+            return MaterialPageRoute(builder: (_) => const FAQScreen());
+          case '/hospital-list':
+            final args = settings.arguments as Map<String, dynamic>?;
+            final nearbyOnly = args?['nearbyOnly'] as bool? ?? false;
+            return MaterialPageRoute(
+              builder: (_) => HospitalListScreen(nearbyOnly: nearbyOnly),
+            );
+          case '/doctor-list':
+            final args = settings.arguments as Map<String, dynamic>?;
+            final searchQuery = args?['searchQuery'] as String?;
+            return MaterialPageRoute(
+              builder: (_) => DoctorListScreen(initialSearchQuery: searchQuery),
+            );
+          case '/search-results':
+            return MaterialPageRoute(builder: (_) => const SearchResultsScreen());
+          default:
+            return MaterialPageRoute(builder: (_) => const LandingPage());
+        }
       },
     );
   }
