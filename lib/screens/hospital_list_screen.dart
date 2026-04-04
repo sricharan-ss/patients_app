@@ -3,7 +3,9 @@ import '../core/app_colors.dart';
 import 'hospital_detail_screen.dart';
 
 class HospitalListScreen extends StatefulWidget {
-  const HospitalListScreen({super.key});
+  final bool nearbyOnly;
+
+  const HospitalListScreen({super.key, this.nearbyOnly = false});
 
   @override
   State<HospitalListScreen> createState() => _HospitalListScreenState();
@@ -14,7 +16,6 @@ class _HospitalListScreenState extends State<HospitalListScreen> {
   
   // Filter states
   String? _appliedLocation;
-  String _appliedRating = 'Any';
   Set<String> _appliedSpecialties = {};
 
   static const _hospitals = [
@@ -22,32 +23,28 @@ class _HospitalListScreenState extends State<HospitalListScreen> {
       name: 'City General Hospital',
       location: 'New York',
       distance: '2.3 km',
-      rating: '4.5',
-      reviews: '856 reviews',
+      distanceNum: 2.3,
       tags: ['Cardiology', 'Orthopedics', 'Neurology'],
     ),
     (
       name: 'Metro Health Center',
       location: 'New York',
       distance: '3.1 km',
-      rating: '4.7',
-      reviews: '612 reviews',
+      distanceNum: 3.1,
       tags: ['Endocrinology', 'Pediatrics', 'Dermatology'],
     ),
     (
       name: 'Sunrise Medical',
       location: 'New York',
       distance: '4.5 km',
-      rating: '4.6',
-      reviews: '493 reviews',
+      distanceNum: 4.5,
       tags: ['General Medicine', 'Surgery', 'Radiology'],
     ),
     (
       name: 'Wellness Clinic',
       location: 'New York',
       distance: '5.2 km',
-      rating: '4.4',
-      reviews: '287 reviews',
+      distanceNum: 5.2,
       tags: ['Family Medicine', 'Psychiatry'],
     ),
   ];
@@ -67,40 +64,38 @@ class _HospitalListScreenState extends State<HospitalListScreen> {
   }
 
   List<dynamic> get _filteredHospitals {
-    return _hospitals.where((h) {
+    var result = _hospitals.where((h) {
       // 1. Search Query
       final matchesQuery = _searchQuery.isEmpty ||
           h.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           h.location.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           h.tags.any((t) => t.toLowerCase().contains(_searchQuery.toLowerCase()));
-      
-      // 2. Rating
-      bool matchesRating = true;
-      if (_appliedRating != 'Any') {
-        double minRating = double.tryParse(_appliedRating.replaceAll('+', '')) ?? 0.0;
-        double hospitalRating = double.tryParse(h.rating) ?? 0.0;
-        if (hospitalRating < minRating) matchesRating = false;
-      }
 
-      // 3. Location
+      // 2. Location
       bool matchesLocation = true;
       if (_appliedLocation != null) {
         matchesLocation = h.location == _appliedLocation;
       }
 
-      // 4. Specialties
+      // 3. Specialties
       bool matchesSpecialty = true;
       if (_appliedSpecialties.isNotEmpty) {
         matchesSpecialty = h.tags.any((t) => _appliedSpecialties.contains(t));
       }
       
-      return matchesQuery && matchesRating && matchesLocation && matchesSpecialty;
+      return matchesQuery && matchesLocation && matchesSpecialty;
     }).toList();
+
+    // Sort by distance if nearby mode
+    if (widget.nearbyOnly) {
+      result.sort((a, b) => a.distanceNum.compareTo(b.distanceNum));
+    }
+
+    return result;
   }
 
   void _showFilterSheet() {
     String? tempLocation = _appliedLocation;
-    String tempRating = _appliedRating;
     Set<String> tempSpecialties = Set.from(_appliedSpecialties);
 
     showModalBottomSheet(
@@ -119,7 +114,7 @@ class _HospitalListScreenState extends State<HospitalListScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
-                  color: isSelected ? AppColors.accent : const Color(0xFFFBF6EC), // Light cream
+                  color: isSelected ? AppColors.accent : const Color(0xFFFBF6EC),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
                     color: isSelected ? AppColors.accent : AppColors.surface,
@@ -150,7 +145,7 @@ class _HospitalListScreenState extends State<HospitalListScreen> {
 
           return SafeArea(
             child: SizedBox(
-              height: MediaQuery.of(context).size.height * 0.85,
+              height: MediaQuery.of(context).size.height * 0.75,
               child: Column(
                 children: [
                   // Header
@@ -197,21 +192,6 @@ class _HospitalListScreenState extends State<HospitalListScreen> {
                             }).toList(),
                           ),
                           const SizedBox(height: 24),
-                          
-                          buildSectionTitle('Minimum Rating'),
-                          const SizedBox(height: 12),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: ['Any', '3+', '3.5+', '4+', '4.5+'].map((rating) {
-                              return buildChip(
-                                rating,
-                                tempRating == rating,
-                                () => setModalState(() => tempRating = rating),
-                              );
-                            }).toList(),
-                          ),
-                          const SizedBox(height: 24),
 
                           buildSectionTitle('Specialties'),
                           const SizedBox(height: 12),
@@ -250,7 +230,6 @@ class _HospitalListScreenState extends State<HospitalListScreen> {
                             onTap: () {
                               setModalState(() {
                                 tempLocation = null;
-                                tempRating = 'Any';
                                 tempSpecialties.clear();
                               });
                             },
@@ -279,7 +258,6 @@ class _HospitalListScreenState extends State<HospitalListScreen> {
                             onTap: () {
                               setState(() {
                                 _appliedLocation = tempLocation;
-                                _appliedRating = tempRating;
                                 _appliedSpecialties = tempSpecialties;
                               });
                               Navigator.pop(context);
@@ -316,14 +294,16 @@ class _HospitalListScreenState extends State<HospitalListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isFilterActive = _appliedLocation != null || _appliedSpecialties.isNotEmpty;
+
     return Scaffold(
       backgroundColor: AppColors.warmWhite,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         foregroundColor: AppColors.warmWhite,
-        title: const Text(
-          'Hospitals',
-          style: TextStyle(fontWeight: FontWeight.w700),
+        title: Text(
+          widget.nearbyOnly ? 'Nearby Hospitals' : 'Hospitals',
+          style: const TextStyle(fontWeight: FontWeight.w700),
         ),
         centerTitle: true,
         flexibleSpace: Container(
@@ -339,6 +319,29 @@ class _HospitalListScreenState extends State<HospitalListScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            // Nearby indicator
+            if (widget.nearbyOnly)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                color: const Color(0xFFE8F5E9),
+                child: Row(
+                  children: [
+                    const Icon(Icons.location_on, color: Color(0xFF2E7D32), size: 16),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'Showing hospitals sorted by distance from your location',
+                        style: TextStyle(
+                          color: Color(0xFF2E7D32),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
               child: Row(
@@ -394,19 +397,13 @@ class _HospitalListScreenState extends State<HospitalListScreen> {
                       decoration: BoxDecoration(
                         color: AppColors.cream,
                         borderRadius: BorderRadius.circular(14),
-                        border: (() {
-                          final isFilterActive = _appliedLocation != null || _appliedRating != 'Any' || _appliedSpecialties.isNotEmpty;
-                          return Border.all(
-                            color: isFilterActive ? AppColors.accent : AppColors.surface,
-                          );
-                        })(),
+                        border: Border.all(
+                          color: isFilterActive ? AppColors.accent : AppColors.surface,
+                        ),
                       ),
                       child: Icon(
                         Icons.filter_alt_outlined, 
-                        color: (() {
-                          final isFilterActive = _appliedLocation != null || _appliedRating != 'Any' || _appliedSpecialties.isNotEmpty;
-                          return isFilterActive ? AppColors.accent : AppColors.brownMid;
-                        })(), 
+                        color: isFilterActive ? AppColors.accent : AppColors.brownMid, 
                         size: 20
                       ),
                     ),
@@ -443,9 +440,8 @@ class _HospitalListScreenState extends State<HospitalListScreen> {
                             name: h.name,
                             location: h.location,
                             distance: h.distance,
-                            rating: h.rating,
-                            reviews: h.reviews,
                             tags: h.tags,
+                            isNearby: widget.nearbyOnly,
                           ),
                         );
                       },
@@ -463,17 +459,15 @@ class _HospitalRowCard extends StatelessWidget {
     required this.name,
     required this.location,
     required this.distance,
-    required this.rating,
-    required this.reviews,
     required this.tags,
+    this.isNearby = false,
   });
 
   final String name;
   final String location;
   final String distance;
-  final String rating;
-  final String reviews;
   final List<String> tags;
+  final bool isNearby;
 
   @override
   Widget build(BuildContext context) {
@@ -519,40 +513,34 @@ class _HospitalRowCard extends StatelessWidget {
           const SizedBox(height: 4),
           Row(
             children: [
-              const Icon(Icons.location_on_outlined, color: AppColors.brownMid, size: 12),
+              const Icon(Icons.location_on_outlined, color: Color(0xFF6B3A1F), size: 12),
               const SizedBox(width: 4),
               Text(
                 '$location · $distance',
-                style: const TextStyle(
-                  color: AppColors.brownMid,
+                style: TextStyle(
+                  color: isNearby ? const Color(0xFF2E7D32) : const Color(0xFF6B3A1F),
                   fontSize: 14,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: isNearby ? FontWeight.w600 : FontWeight.w500,
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              const Icon(Icons.star, color: AppColors.accent, size: 16),
-              const SizedBox(width: 4),
-              Text(
-                rating,
-                style: const TextStyle(
-                  color: AppColors.brownDeep,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
+              if (isNearby) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8F5E9),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'Nearby',
+                    style: TextStyle(
+                      color: Color(0xFF2E7D32),
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                '($reviews)',
-                style: const TextStyle(
-                  color: AppColors.brownLight,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
+              ],
             ],
           ),
           const SizedBox(height: 8),

@@ -1,97 +1,120 @@
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
+import 'doctor_profile_screen.dart';
 
 // ─── Data model ──────────────────────────────────────────────────────────────
 
 class _HospitalData {
   const _HospitalData({
     required this.name,
+    required this.city, // Instead of full address, React has city in cover
     required this.address,
     required this.timings,
-    required this.rating,
-    required this.reviewCount,
+    required this.verified,
     required this.specialties,
     required this.doctors,
   });
 
   final String name;
+  final String city;
   final String address;
   final String timings;
-  final String rating;
-  final String reviewCount;
+  final bool verified;
   final List<String> specialties;
   final List<_DoctorData> doctors;
 }
 
 class _DoctorData {
   const _DoctorData({
+    required this.id,
     required this.name,
     required this.specialty,
-    required this.rating,
+    required this.experience,
+    required this.totalPatients,
+    required this.fee,
   });
 
+  final String id;
   final String name;
   final String specialty;
-  final String rating;
+  final int experience;
+  final int totalPatients;
+  final int fee;
 }
 
-// ─── Static data (mirrors hospital_list_screen + doctor_list_screen) ─────────
+// ─── Static data ─────────────────────────────────────────────────────────────
 
 const _hospitals = [
   _HospitalData(
     name: 'City General Hospital',
+    city: 'New York',
     address: '123 Main Street, New York, NY 10001',
     timings: '24/7 Emergency',
-    rating: '4.5',
-    reviewCount: '856',
+    verified: true,
     specialties: ['Cardiology', 'Orthopedics', 'Neurology'],
     doctors: [
-      _DoctorData(name: 'Dr. Emily Martinez', specialty: 'Cardiologist', rating: '4.8'),
-      _DoctorData(name: 'Dr. Rajesh Nair', specialty: 'Neurologist', rating: '4.5'),
+      _DoctorData(
+        id: 'd1',
+        name: 'Dr. Emily Martinez',
+        specialty: 'Cardiologist',
+        experience: 15,
+        totalPatients: 1200,
+        fee: 150,
+      ),
+      _DoctorData(
+        id: 'd2',
+        name: 'Dr. Michael Brown',
+        specialty: 'Orthopedist',
+        experience: 18,
+        totalPatients: 750,
+        fee: 200,
+      ),
+      _DoctorData(
+        id: 'd3',
+        name: 'Dr. Priya Patel',
+        specialty: 'Neurologist',
+        experience: 14,
+        totalPatients: 890,
+        fee: 220,
+      ),
     ],
   ),
   _HospitalData(
     name: 'Metro Health Center',
+    city: 'New York',
     address: '456 Oak Avenue, New York, NY 10002',
     timings: '8:00 AM - 10:00 PM',
-    rating: '4.7',
-    reviewCount: '612',
+    verified: true,
     specialties: ['Endocrinology', 'Pediatrics', 'Dermatology'],
     doctors: [
-      _DoctorData(name: 'Dr. Michael Brown', specialty: 'Orthopedist', rating: '4.6'),
-      _DoctorData(name: 'Dr. James Wilson', specialty: 'Endocrinologist', rating: '4.9'),
+      _DoctorData(
+        id: 'd4',
+        name: 'Dr. James Wilson',
+        specialty: 'Endocrinologist',
+        experience: 12,
+        totalPatients: 950,
+        fee: 180,
+      ),
     ],
   ),
   _HospitalData(
     name: 'Sunrise Medical',
-    address: '789 Broadway, New York, NY 10003',
+    city: 'Los Angeles',
+    address: '789 Broadway, Los Angeles, CA 90015',
     timings: '7:00 AM - 9:00 PM',
-    rating: '4.6',
-    reviewCount: '493',
+    verified: true,
     specialties: ['General Medicine', 'Surgery', 'Radiology'],
     doctors: [
-      _DoctorData(name: 'Dr. Sarah Chen', specialty: 'General Physician', rating: '4.7'),
-      _DoctorData(name: 'Dr. Kevin Park', specialty: 'Surgeon', rating: '4.5'),
+      _DoctorData(
+        id: 'd5',
+        name: 'Dr. Sarah Chen',
+        specialty: 'General Physician',
+        experience: 8,
+        totalPatients: 1500,
+        fee: 100,
+      ),
     ],
   ),
-  _HospitalData(
-    name: 'Wellness Clinic',
-    address: '321 Park Avenue, New York, NY 10004',
-    timings: '9:00 AM - 7:00 PM',
-    rating: '4.4',
-    reviewCount: '287',
-    specialties: ['Family Medicine', 'Psychiatry'],
-    doctors: [
-      _DoctorData(name: 'Dr. Aisha Khan', specialty: 'Dermatologist', rating: '4.7'),
-      _DoctorData(name: 'Dr. Priya Sharma', specialty: 'Psychiatrist', rating: '4.3'),
-    ],
-  ),
-];
-
-const _reviews = [
-  (name: 'John Smith', rating: 5, comment: 'Excellent service and very professional staff.'),
-  (name: 'Emma Davis', rating: 4, comment: 'Great facility, clean and well-maintained.'),
-  (name: 'Michael Chen', rating: 5, comment: 'The doctors are highly skilled and caring.'),
 ];
 
 // ─── Screen ──────────────────────────────────────────────────────────────────
@@ -113,279 +136,297 @@ class HospitalDetailScreen extends StatelessWidget {
     final hospital = _findHospital(hospitalName);
 
     return Scaffold(
-      backgroundColor: AppColors.warmWhite,
+      backgroundColor: const Color(0xFFFFFDF8),
       body: Column(
         children: [
-          // ── Brown header ──────────────────────────────────────────────
-          SafeArea(
-            bottom: false,
-            child: Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                  colors: [AppColors.brownDeep, AppColors.brownMid],
-                ),
+          // ─── Brown Header ──────────────────────────────────────────────
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                colors: [AppColors.brownDeep, AppColors.brownMid],
               ),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back, color: AppColors.warmWhite, size: 22),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                  Expanded(
-                    child: Text(
-                      hospital.name,
-                      textAlign: TextAlign.center,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.warmWhite,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
+            ),
+            child: SafeArea(
+              bottom: false,
+              child: SizedBox(
+                height: 56,
+                child: Stack(
+                  children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: IconButton(
+                        icon: const Icon(Icons.arrow_back, color: Colors.white),
+                        onPressed: () => Navigator.of(context).pop(),
                       ),
                     ),
-                  ),
-                  // Mirror of back button for centering
-                  const SizedBox(width: 48),
-                ],
+                    Center(
+                      child: Text(
+                        hospital.name,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
 
-          // ── Scrollable content ────────────────────────────────────────
           Expanded(
             child: SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Cover photo placeholder
+                  // ─── Cover Photo ───────────────────────────────────────────────
                   Container(
+                    height: 160,
                     width: double.infinity,
-                    height: 180,
-                    color: const Color(0xFFF7EFDF),
-                    child: const Center(
-                      child: Icon(
-                        Icons.domain_rounded,
-                        color: Color(0xFFEFE2CC),
-                        size: 72,
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Color(0xFF3B1F0A),
+                          Color(0xFF6B3A1F),
+                        ],
                       ),
                     ),
-                  ),
-
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Stack(
+                      alignment: Alignment.center,
                       children: [
-                        // ── Rating row ────────────────────────────────
-                        Row(
-                          children: [
-                            const Icon(Icons.star, color: AppColors.accent, size: 20),
-                            const SizedBox(width: 4),
-                            Text(
-                              hospital.rating,
-                              style: const TextStyle(
-                                color: AppColors.brownDeep,
-                                fontSize: 17,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              '(${hospital.reviewCount} reviews)',
-                              style: const TextStyle(
-                                color: AppColors.brownLight,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: AppColors.accent.withOpacity(0.12),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: const Text(
-                                'VITADATA Verified',
-                                style: TextStyle(
-                                  color: AppColors.accent,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
+                        // Decorative circles matching React design opacity-10
+                        Opacity(
+                          opacity: 0.1,
+                          child: Stack(
+                            children: [
+                              Positioned(
+                                top: 16,
+                                left: 32,
+                                child: Container(
+                                  width: 80,
+                                  height: 80,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.white, width: 2),
+                                  ),
                                 ),
+                              ),
+                              Positioned(
+                                bottom: 16,
+                                right: 32,
+                                child: Container(
+                                  width: 128,
+                                  height: 128,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.white, width: 2),
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                top: 32,
+                                right: 64,
+                                child: Container(
+                                  width: 48,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.white, width: 1),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        
+                        // Content
+                        Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 56,
+                              height: 56,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Center(
+                                child: Icon(Icons.domain, color: Color(0xFFFBF6EC), size: 28),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              hospital.city,
+                              style: TextStyle(
+                                color: const Color(0xFFFBF6EC).withOpacity(0.8),
+                                fontSize: 12,
                               ),
                             ),
                           ],
                         ),
+                      ],
+                    ),
+                  ),
 
+                  // ─── Content Padding ──────────────────────────────────────────
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // ─── Header Info ───────────────────────────────────────
+                        Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 8,
+                          children: [
+                            Text(
+                              hospital.name,
+                              style: const TextStyle(
+                                color: Color(0xFF3B1F0A),
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
+                                fontFamily: 'Playfair Display',
+                              ),
+                            ),
+                            if (hospital.verified)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFD4822A).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.workspace_premium, color: Color(0xFFD4822A), size: 12),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'VITADATA Verified',
+                                      style: TextStyle(
+                                        color: Color(0xFFD4822A),
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ),
                         const SizedBox(height: 12),
-
-                        // ── Address ───────────────────────────────────
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Padding(
                               padding: EdgeInsets.only(top: 2),
-                              child: Icon(Icons.location_on_outlined, color: AppColors.brownLight, size: 16),
+                              child: Icon(Icons.location_on_outlined, color: Color(0xFFA0622A), size: 16),
                             ),
-                            const SizedBox(width: 6),
+                            const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 hospital.address,
                                 style: const TextStyle(
-                                  color: AppColors.brownMid,
+                                  color: Color(0xFF6B3A1F),
                                   fontSize: 13,
-                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
                             ),
                           ],
                         ),
-
                         const SizedBox(height: 8),
-
-                        // ── Timings ───────────────────────────────────
                         Row(
                           children: [
-                            const Icon(Icons.access_time_outlined, color: AppColors.brownLight, size: 16),
-                            const SizedBox(width: 6),
+                            const Icon(Icons.access_time_outlined, color: Color(0xFFA0622A), size: 16),
+                            const SizedBox(width: 8),
                             Text(
                               hospital.timings,
                               style: const TextStyle(
-                                color: AppColors.brownMid,
+                                color: Color(0xFF6B3A1F),
                                 fontSize: 13,
-                                fontWeight: FontWeight.w500,
                               ),
                             ),
                           ],
                         ),
 
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 24),
 
-                        // ── Specialties ───────────────────────────────
+                        // ─── Specialties ───────────────────────────────────────
                         const Text(
                           'Specialties',
                           style: TextStyle(
-                            color: AppColors.brownDeep,
+                            color: Color(0xFF3B1F0A),
                             fontSize: 15,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 12),
                         Wrap(
                           spacing: 8,
                           runSpacing: 8,
-                          children: hospital.specialties
-                              .map(
-                                (s) => Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.cream,
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(color: AppColors.surface),
-                                  ),
-                                  child: Text(
-                                    s,
-                                    style: const TextStyle(
-                                      color: AppColors.brownMid,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
+                          children: hospital.specialties.map((s) {
+                            return Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFBF6EC),
+                                border: Border.all(color: const Color(0xFFEFE2CC)),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                s,
+                                style: const TextStyle(
+                                  color: Color(0xFF6B3A1F),
+                                  fontSize: 12,
                                 ),
-                              )
-                              .toList(),
-                        ),
-
-                        const SizedBox(height: 22),
-
-                        // ── Reviews ───────────────────────────────────
-                        const Text(
-                          'Reviews',
-                          style: TextStyle(
-                            color: AppColors.brownDeep,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Column(
-                          children: _reviews
-                              .map(
-                                (r) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 10),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.cream,
-                                      borderRadius: BorderRadius.circular(14),
-                                      border: Border.all(color: AppColors.surface),
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Text(
-                                              r.name,
-                                              style: const TextStyle(
-                                                color: AppColors.brownDeep,
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                            Row(
-                                              children: List.generate(
-                                                r.rating,
-                                                (_) => const Icon(Icons.star, color: AppColors.accent, size: 13),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Text(
-                                          r.comment,
-                                          style: const TextStyle(
-                                            color: AppColors.brownMid,
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w400,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              )
-                              .toList(),
-                        ),
-
-                        const SizedBox(height: 10),
-
-                        // ── Doctors ───────────────────────────────────
-                        const Text(
-                          'Doctors at this hospital',
-                          style: TextStyle(
-                            color: AppColors.brownDeep,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        SizedBox(
-                          height: 160,
-                          child: ListView.separated(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: hospital.doctors.length,
-                            separatorBuilder: (_, __) => const SizedBox(width: 10),
-                            itemBuilder: (context, i) {
-                              final doc = hospital.doctors[i];
-                              return _DoctorCard(doctor: doc);
-                            },
-                          ),
+                              ),
+                            );
+                          }).toList(),
                         ),
 
                         const SizedBox(height: 24),
+
+                        // ─── Medical Staff ─────────────────────────────────────
+                        Text(
+                          'Medical Staff (${hospital.doctors.length})',
+                          style: const TextStyle(
+                            color: Color(0xFF3B1F0A),
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        if (hospital.doctors.isEmpty)
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFBF6EC),
+                              border: Border.all(color: const Color(0xFFEFE2CC)),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: const Column(
+                              children: [
+                                Icon(Icons.people_outline, color: Color(0xFFEFE2CC), size: 32),
+                                SizedBox(height: 8),
+                                Text(
+                                  'No doctors listed yet',
+                                  style: TextStyle(
+                                    color: Color(0xFFA0622A),
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          Column(
+                            children: hospital.doctors.map((doc) => _DoctorCard(doctor: doc)).toList(),
+                          ),
                       ],
                     ),
                   ),
@@ -399,91 +440,213 @@ class HospitalDetailScreen extends StatelessWidget {
   }
 }
 
-// ─── Doctor card (horizontal list) ───────────────────────────────────────────
+
+// ─── Doctor Card ─────────────────────────────────────────────────────────────
 
 class _DoctorCard extends StatelessWidget {
   const _DoctorCard({required this.doctor});
 
   final _DoctorData doctor;
 
-  String _initials(String name) {
-    return name
-        .split(' ')
-        .where((p) => p.isNotEmpty)
-        .map((p) => p[0].toUpperCase())
-        .take(2)
-        .join();
-  }
-
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 120,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: AppColors.cream,
+        color: const Color(0xFFFBF6EC),
+        border: Border.all(color: const Color(0xFFEFE2CC)),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.surface),
       ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: const BoxDecoration(
-              color: AppColors.accent,
-              shape: BoxShape.circle,
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              _initials(doctor.name),
-              style: const TextStyle(
-                color: AppColors.cream,
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            doctor.name,
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: AppColors.brownDeep,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            doctor.specialty,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: AppColors.brownLight,
-              fontSize: 10,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 5),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.star, color: AppColors.accent, size: 11),
-              const SizedBox(width: 3),
-              Text(
-                doctor.rating,
-                style: const TextStyle(
-                  color: AppColors.brownDeep,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () {
+                // navigate to doctor if needed
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => DoctorProfileScreen(
+                  id: doctor.id,
+                  name: doctor.name,
+                  specialty: doctor.specialty,
+                  hospital: 'City General Hospital', // default mock 
+                  experience: doctor.experience,
+                  totalPatients: doctor.totalPatients,
+                  fee: doctor.fee,
                 ),
               ),
-            ],
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              children: [
+                // Top row: Info
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Avatar
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Color(0xFFD4822A),
+                            Color(0xFFA0622A),
+                          ],
+                        ),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        doctor.name.startsWith('Dr. ') && doctor.name.length > 4 
+                            ? doctor.name[4] 
+                            : (doctor.name.isNotEmpty ? doctor.name[0] : 'D'),
+                        style: const TextStyle(
+                          color: Color(0xFFFBF6EC),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          fontFamily: 'Playfair Display',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Details
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            doctor.name,
+                            style: const TextStyle(
+                              color: Color(0xFF3B1F0A),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              fontFamily: 'Playfair Display',
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            doctor.specialty,
+                            style: const TextStyle(
+                              color: Color(0xFF6B3A1F),
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 4,
+                            children: [
+                              Text(
+                                '${doctor.experience}y Experience',
+                                style: const TextStyle(
+                                  color: Color(0xFFA0622A),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              Text(
+                                '${doctor.totalPatients}+ Patients',
+                                style: const TextStyle(
+                                  color: Color(0xFFA0622A),
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Price & arrow
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '\$${doctor.fee}',
+                          style: const TextStyle(
+                            color: Color(0xFFD4822A),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF3B1F0A),
+                            shape: BoxShape.circle,
+                          ),
+                          alignment: Alignment.center,
+                          child: const Icon(
+                            Icons.chevron_right,
+                            color: Color(0xFFFBF6EC),
+                            size: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Divider(color: Color(0xFFEFE2CC), height: 1),
+                const SizedBox(height: 12),
+                // Bottom row: Schedule
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: Colors.green, // matches green-500
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const Text(
+                          'Available Mon–Fri, 9AM–6PM',
+                          style: TextStyle(
+                            color: Color(0xFF6B3A1F),
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFD4822A).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.calendar_month, color: Color(0xFFD4822A), size: 12),
+                          SizedBox(width: 4),
+                          Text(
+                            'Schedule',
+                            style: TextStyle(
+                              color: Color(0xFFD4822A),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
     );
   }
