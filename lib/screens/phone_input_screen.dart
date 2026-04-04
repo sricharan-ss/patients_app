@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/app_colors.dart';
+import '../core/session_store.dart';
 import '../widgets/auth_header.dart';
 
 class PhoneInputScreen extends StatefulWidget {
@@ -36,6 +37,7 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
       setState(() {
         _errorMessage = null;
       });
+      SessionStore.phoneNumber = '+91 ${_phoneController.text.trim()}';
       SystemSound.play(SystemSoundType.alert);
       Navigator.pushNamed(
         context,

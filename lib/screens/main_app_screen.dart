@@ -22,7 +22,7 @@ class _MainAppScreenState extends State<MainAppScreen> {
           _HomeTab(),
           _PlaceholderTab(label: 'Medications', icon: Icons.medication_outlined),
           _PlaceholderTab(label: 'Medical History', icon: Icons.folder_outlined),
-          _PlaceholderTab(label: 'Profile', icon: Icons.person_outline),
+          _ProfileTab(),
         ],
       ),
       bottomNavigationBar: _BottomNav(
@@ -798,6 +798,213 @@ class _RecentOrderCard extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────
 // Bottom Navigation
 // ─────────────────────────────────────────────────────────────
+class _ProfileTab extends StatelessWidget {
+  const _ProfileTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: double.infinity,
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [AppColors.brownDeep, AppColors.brownMid],
+            ),
+            borderRadius: BorderRadius.only(
+              bottomLeft: Radius.circular(28),
+              bottomRight: Radius.circular(28),
+            ),
+          ),
+          child: SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Image.asset(
+                        'assets/images/onlyicon.png',
+                        height: 32,
+                        width: 32,
+                        fit: BoxFit.contain,
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'VITADATA',
+                        style: TextStyle(
+                          color: AppColors.warmWhite,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                      const Spacer(),
+                      InkWell(
+                        borderRadius: BorderRadius.circular(18),
+                        onTap: () => Navigator.pushNamed(context, '/settings'),
+                        child: const Padding(
+                          padding: EdgeInsets.all(4),
+                          child: Icon(
+                            Icons.settings_outlined,
+                            color: AppColors.cream,
+                            size: 26,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const CircleAvatar(
+                    radius: 30,
+                    backgroundColor: AppColors.accent,
+                    child: Text(
+                      'S',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 28,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Sarah Johnso',
+                    style: TextStyle(
+                      color: AppColors.warmWhite,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  const Text(
+                    'VITADATA ID: VD-2024-001234',
+                    style: TextStyle(
+                      color: Color(0xFFDABEA8),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(12, 14, 12, 20),
+            child: Column(
+              children: const [
+                _ProfileMenuCard(
+                  icon: Icons.person_outline,
+                  title: 'My Information',
+                  subtitle: '32 years - O+',
+                  routeName: '/my-information',
+                ),
+                SizedBox(height: 10),
+                _ProfileMenuCard(
+                  icon: Icons.inventory_2_outlined,
+                  title: 'Order History',
+                  subtitle: '2 orders',
+                  routeName: '/order-history',
+                ),
+                SizedBox(height: 10),
+                _ProfileMenuCard(
+                  icon: Icons.lock_outline,
+                  title: 'Secure Vault',
+                  subtitle: '8 files stored',
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProfileMenuCard extends StatelessWidget {
+  const _ProfileMenuCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.routeName,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String? routeName;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: routeName == null ? null : () => Navigator.pushNamed(context, routeName!),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppColors.cream,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.surface),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: const BoxDecoration(
+                color: AppColors.surface,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                color: AppColors.brownLight,
+                size: 18,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: AppColors.brownDeep,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: AppColors.brownLight,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.chevron_right,
+              color: AppColors.brownLight,
+              size: 22,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _BottomNav extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onTap;
