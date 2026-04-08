@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import 'my_information_screen.dart';
+import 'order_history_screen.dart';
+import 'secure_vault_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -37,16 +39,14 @@ class ProfileScreen extends StatelessWidget {
                 ),
                 child: Column(
                   children: [
-                    Stack(
-                      alignment: Alignment.centerLeft,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.arrow_back, color: Colors.white),
-                          onPressed: () => Navigator.of(context).pop(),
-                          padding: EdgeInsets.zero,
-                          alignment: Alignment.centerLeft,
-                        ),
-                      ],
+                    Align(
+                      alignment: Alignment.topLeft,
+                      child: IconButton(
+                        icon: const Icon(Icons.arrow_back, color: Colors.white),
+                        onPressed: () => Navigator.of(context).pop(),
+                        padding: EdgeInsets.zero,
+                        alignment: Alignment.topLeft,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Container(
@@ -120,7 +120,12 @@ class ProfileScreen extends StatelessWidget {
                         title: 'Order History',
                         preview: '2 orders',
                         icon: Icons.inventory_2_outlined,
-                        onTap: () {},
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const OrderHistoryScreen()),
+                          );
+                        },
                       ),
                       const SizedBox(height: 12),
 
@@ -130,7 +135,12 @@ class ProfileScreen extends StatelessWidget {
                         title: 'Secure Vault',
                         preview: '8 files stored',
                         icon: Icons.lock_outline,
-                        onTap: () {},
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const SecureVaultScreen()),
+                          );
+                        },
                       ),
                     ],
                   ),

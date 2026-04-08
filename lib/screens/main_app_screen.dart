@@ -3,6 +3,7 @@ import 'package:geolocator/geolocator.dart';
 import '../core/app_colors.dart';
 import '../screens/hospital_detail_screen.dart';
 import 'profile_screen.dart';
+import 'medications_screen.dart';
 
 class MainAppScreen extends StatefulWidget {
   const MainAppScreen({super.key});
@@ -125,9 +126,9 @@ class _MainAppScreenState extends State<MainAppScreen> {
         index: _selectedIndex,
         children: const [
           _HomeTab(),
-          _PlaceholderTab(label: 'Medications', icon: Icons.medication_outlined),
+          MedicationsScreen(),
           _PlaceholderTab(label: 'Medical History', icon: Icons.folder_outlined),
-          _PlaceholderTab(label: 'Profile', icon: Icons.person_outline),
+          ProfileScreen(),
         ],
       ),
       bottomNavigationBar: _BottomNav(
