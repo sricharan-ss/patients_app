@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+
 import '../core/app_colors.dart';
+import '../core/session_store.dart';
 
 class MyInformationScreen extends StatefulWidget {
   const MyInformationScreen({super.key});
@@ -9,42 +11,21 @@ class MyInformationScreen extends StatefulWidget {
 }
 
 class _MyInformationScreenState extends State<MyInformationScreen> {
-  final _nameController = TextEditingController(text: 'Charan');
-  final _ageController = TextEditingController(text: '28');
-  String _bloodGroup = 'O+';
-  String _gender = 'Male';
-  final _phoneController = TextEditingController(text: '+91 98765 43210');
-  final _emailController = TextEditingController(text: 'charan@example.com');
-  final _emergencyController = TextEditingController(text: '+91 98765 99999');
+  final _nameController = TextEditingController(text: 'Sarah Johnson');
+  final _ageController = TextEditingController(text: '32');
+  final _phoneController = TextEditingController();
+  final _emailController = TextEditingController(text: 'sarah.johnson@email.com');
+  final _emergencyController = TextEditingController(text: '+1 234 567 8901');
 
-  final List<String> _conditions = ['Hypertension', 'Asthma'];
-  bool _showAddCondition = false;
-  final _newConditionController = TextEditingController();
-
+  String _selectedGender = 'Female';
+  String? _selectedBloodGroup = 'O+';
   final List<String> _bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
-  final List<String> _genders = ['Male', 'Female', 'Other'];
+  final Set<String> _conditions = {'Diabetes Type 2', 'Hypertension'};
 
-  void _toggleCondition(String condition) {
-    setState(() {
-      if (_conditions.contains(condition)) {
-        _conditions.remove(condition);
-      } else {
-        _conditions.add(condition);
-      }
-    });
-  }
-
-  void _addNewCondition() {
-    final text = _newConditionController.text.trim();
-    if (text.isNotEmpty && !_conditions.contains(text)) {
-      setState(() {
-        _conditions.add(text);
-      });
-    }
-    setState(() {
-      _newConditionController.clear();
-      _showAddCondition = false;
-    });
+  @override
+  void initState() {
+    super.initState();
+    _phoneController.text = SessionStore.phoneNumber;
   }
 
   @override
@@ -54,317 +35,299 @@ class _MyInformationScreenState extends State<MyInformationScreen> {
     _phoneController.dispose();
     _emailController.dispose();
     _emergencyController.dispose();
-    _newConditionController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFFFDF8),
-      body: Stack(
-        children: [
-          Column(
+      backgroundColor: AppColors.warmWhite,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        foregroundColor: Colors.white,
+        title: const Text(
+          'My Information',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
+        centerTitle: true,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: [AppColors.brownDeep, AppColors.brownMid],
+            ),
+          ),
+        ),
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
-              Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                    colors: [AppColors.brownDeep, AppColors.brownMid],
-                  ),
-                ),
-                child: SafeArea(
-                  bottom: false,
-                  child: SizedBox(
-                    height: 56,
-                    child: Stack(
+              const _FieldLabel('Full Name'),
+              const SizedBox(height: 8),
+              _InputField(controller: _nameController),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: IconButton(
-                            icon: const Icon(Icons.arrow_back, color: Colors.white),
-                            onPressed: () => Navigator.of(context).pop(),
-                          ),
-                        ),
-                        const Center(
-                          child: Text(
-                            'My Information',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
+                        const _FieldLabel('Age'),
+                        const SizedBox(height: 8),
+                        _InputField(
+                          controller: _ageController,
+                          keyboardType: TextInputType.number,
                         ),
                       ],
                     ),
                   ),
-                ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const _FieldLabel('Blood Group'),
+                        const SizedBox(height: 8),
+                        _BloodGroupField(
+                          value: _selectedBloodGroup,
+                          items: _bloodGroups,
+                          onChanged: (value) => setState(() => _selectedBloodGroup = value),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.only(left: 16, right: 16, top: 20, bottom: 100),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildLabel('Full Name'),
-                      _buildTextField(_nameController),
-
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildLabel('Age'),
-                                _buildTextField(_ageController, keyboardType: TextInputType.number),
-                              ],
+              const SizedBox(height: 12),
+              const _FieldLabel('Gender'),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  _GenderButton(
+                    label: 'Male',
+                    selected: _selectedGender == 'Male',
+                    onTap: () => setState(() => _selectedGender = 'Male'),
+                  ),
+                  const SizedBox(width: 8),
+                  _GenderButton(
+                    label: 'Female',
+                    selected: _selectedGender == 'Female',
+                    onTap: () => setState(() => _selectedGender = 'Female'),
+                  ),
+                  const SizedBox(width: 8),
+                  _GenderButton(
+                    label: 'Other',
+                    selected: _selectedGender == 'Other',
+                    onTap: () => setState(() => _selectedGender = 'Other'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              const _FieldLabel('Phone Number'),
+              const SizedBox(height: 8),
+              _InputField(controller: _phoneController, keyboardType: TextInputType.phone),
+              const SizedBox(height: 12),
+              const _FieldLabel('Email'),
+              const SizedBox(height: 8),
+              _InputField(controller: _emailController, keyboardType: TextInputType.emailAddress),
+              const SizedBox(height: 12),
+              const _FieldLabel('Emergency Contact'),
+              const SizedBox(height: 8),
+              _InputField(controller: _emergencyController, keyboardType: TextInputType.phone),
+              const SizedBox(height: 12),
+              const _FieldLabel('Chronic Conditions'),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: _conditions
+                    .map(
+                      (condition) => Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: AppColors.cream,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: AppColors.accent),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              condition,
+                              style: const TextStyle(
+                                color: AppColors.brownLight,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildLabel('Blood Group'),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFFBF6EC),
-                                    border: Border.all(color: const Color(0xFFEFE2CC)),
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                  height: 48, // matching textfield height roughly
-                                  child: DropdownButtonHideUnderline(
-                                    child: DropdownButton<String>(
-                                      value: _bloodGroup,
-                                      isExpanded: true,
-                                      icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF3B1F0A)),
-                                      items: _bloodGroups.map((bg) => DropdownMenuItem(value: bg, child: Text(bg, style: const TextStyle(color: Color(0xFF3B1F0A), fontSize: 14)))).toList(),
-                                      onChanged: (val) {
-                                        if (val != null) setState(() => _bloodGroup = val);
-                                      },
-                                    ),
-                                  ),
-                                ),
-                              ],
+                            const SizedBox(width: 8),
+                            const Icon(
+                              Icons.close,
+                              size: 14,
+                              color: AppColors.brownLight,
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-
-                      const SizedBox(height: 16),
-                      _buildLabel('Gender'),
-                      Row(
-                        children: _genders.map((g) {
-                          final isSelected = _gender == g;
-                          return Expanded(
-                            child: Padding(
-                              padding: EdgeInsets.only(right: g == _genders.last ? 0 : 8),
-                              child: GestureDetector(
-                                onTap: () => setState(() => _gender = g),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
-                                  decoration: BoxDecoration(
-                                    color: isSelected ? const Color(0xFFD4822A) : const Color(0xFFFBF6EC),
-                                    border: Border.all(color: isSelected ? const Color(0xFFD4822A) : const Color(0xFFEFE2CC)),
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                  alignment: Alignment.center,
-                                  child: Text(
-                                    g,
-                                    style: TextStyle(
-                                      color: isSelected ? const Color(0xFFFFFDF8) : const Color(0xFF6B3A1F),
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-
-                      const SizedBox(height: 16),
-                      _buildLabel('Phone Number'),
-                      _buildTextField(_phoneController, keyboardType: TextInputType.phone),
-
-                      const SizedBox(height: 16),
-                      _buildLabel('Email'),
-                      _buildTextField(_emailController, keyboardType: TextInputType.emailAddress),
-
-                      const SizedBox(height: 16),
-                      _buildLabel('Emergency Contact'),
-                      _buildTextField(_emergencyController, keyboardType: TextInputType.phone),
-
-                      const SizedBox(height: 16),
-                      _buildLabel('Chronic Conditions'),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          ..._conditions.map((condition) => _buildConditionChip(condition)),
-                          if (_showAddCondition)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFEFE2CC),
-                                border: Border.all(color: const Color(0xFFD4822A), width: 2),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  SizedBox(
-                                    width: 80,
-                                    child: TextField(
-                                      controller: _newConditionController,
-                                      autofocus: true,
-                                      style: const TextStyle(fontSize: 13, color: Color(0xFF3B1F0A)),
-                                      decoration: const InputDecoration(
-                                        isDense: true,
-                                        contentPadding: EdgeInsets.zero,
-                                        border: InputBorder.none,
-                                        hintText: 'New',
-                                        hintStyle: TextStyle(color: Colors.black26),
-                                      ),
-                                      onSubmitted: (_) => _addNewCondition(),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  GestureDetector(
-                                    onTap: _addNewCondition,
-                                    child: const Icon(Icons.add, size: 16, color: Color(0xFF6B3A1F)),
-                                  ),
-                                ],
-                              ),
-                            )
-                          else
-                            GestureDetector(
-                              onTap: () => setState(() => _showAddCondition = true),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFEFE2CC),
-                                  border: Border.all(color: const Color(0xFFD4822A), width: 2),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.add, size: 16, color: Color(0xFF6B3A1F)),
-                                    SizedBox(width: 4),
-                                    Text(
-                                      'Add New',
-                                      style: TextStyle(color: Color(0xFF6B3A1F), fontSize: 13, fontWeight: FontWeight.w500),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
+                    )
+                    .toList(),
+              ),
+              const SizedBox(height: 26),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: () {},
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.brownDeep,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    'Save Changes',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ),
             ],
           ),
-
-          // Bottom Bar
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: const BoxDecoration(
-                color: Color(0xFFFFFDF8),
-                border: Border(top: BorderSide(color: Color(0xFFEFE2CC))),
-              ),
-              child: SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  onPressed: () {
-                    // Save Changes Logic
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Changes Saved!'), backgroundColor: Colors.green),
-                    );
-                    Navigator.of(context).pop();
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF3B1F0A),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    elevation: 0,
-                  ),
-                  child: const Text('Save Changes', style: TextStyle(color: Color(0xFFFBF6EC), fontSize: 15, fontWeight: FontWeight.w600)),
-                ),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
+}
 
-  Widget _buildLabel(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text(
-        text,
-        style: const TextStyle(color: Color(0xFFA0622A), fontSize: 13),
+class _FieldLabel extends StatelessWidget {
+  const _FieldLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: const TextStyle(
+        color: AppColors.brownLight,
+        fontSize: 14,
+        fontWeight: FontWeight.w700,
       ),
     );
   }
+}
 
-  Widget _buildTextField(TextEditingController controller, {TextInputType? keyboardType}) {
+class _InputField extends StatelessWidget {
+  const _InputField({
+    required this.controller,
+    this.keyboardType = TextInputType.text,
+  });
+
+  final TextEditingController controller;
+  final TextInputType keyboardType;
+
+  @override
+  Widget build(BuildContext context) {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
-      style: const TextStyle(color: Color(0xFF3B1F0A), fontSize: 14),
       decoration: InputDecoration(
         filled: true,
-        fillColor: const Color(0xFFFBF6EC),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        fillColor: AppColors.cream,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.surface),
+        ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFFEFE2CC)),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.surface),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFFD4822A)),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
         ),
       ),
     );
   }
+}
 
-  Widget _buildConditionChip(String condition) {
+class _BloodGroupField extends StatelessWidget {
+  const _BloodGroupField({
+    required this.value,
+    required this.items,
+    required this.onChanged,
+  });
+
+  final String? value;
+  final List<String> items;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFEFE2CC),
-        border: Border.all(color: const Color(0xFFD4822A), width: 2),
-        borderRadius: BorderRadius.circular(20),
+        color: AppColors.cream,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.surface),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            condition,
-            style: const TextStyle(color: Color(0xFF6B3A1F), fontSize: 13, fontWeight: FontWeight.w500),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: value,
+          isExpanded: true,
+          icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.brownMid),
+          onChanged: onChanged,
+          items: items
+              .map((e) => DropdownMenuItem<String>(value: e, child: Text(e)))
+              .toList(),
+        ),
+      ),
+    );
+  }
+}
+
+class _GenderButton extends StatelessWidget {
+  const _GenderButton({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 11),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? AppColors.accent : AppColors.cream,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: selected ? AppColors.accent : AppColors.surface),
           ),
-          const SizedBox(width: 4),
-          GestureDetector(
-            onTap: () => _toggleCondition(condition),
-            child: const Icon(Icons.close, size: 14, color: Color(0xFF6B3A1F)),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: selected ? Colors.white : AppColors.brownLight,
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+            ),
           ),
-        ],
+        ),
       ),
     );
   }
