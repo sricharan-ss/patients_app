@@ -4,6 +4,7 @@ import '../core/app_colors.dart';
 import '../screens/hospital_detail_screen.dart';
 import 'profile_screen.dart';
 import 'medications_screen.dart';
+import 'medical_history_screen.dart';
 
 class MainAppScreen extends StatefulWidget {
   const MainAppScreen({super.key});
@@ -127,7 +128,7 @@ class _MainAppScreenState extends State<MainAppScreen> {
         children: const [
           _HomeTab(),
           MedicationsScreen(),
-          _PlaceholderTab(label: 'Medical History', icon: Icons.folder_outlined),
+          MedicalHistoryScreen(),
           ProfileScreen(),
         ],
       ),

@@ -1,29 +1,32 @@
 import 'package:flutter/material.dart';
+
 import '../core/app_colors.dart';
+import 'order_medicines_screen.dart';
 
 class OrderHistoryScreen extends StatelessWidget {
   const OrderHistoryScreen({super.key});
 
+  static const List<Map<String, dynamic>> _orders = [
+    {
+      'id': 'ORD-001234',
+      'status': 'Out for Delivery',
+      'items': ['Metformin 500mg x 60', 'Lisinopril 10mg x 30'],
+      'date': '2026-03-20T00:00:00Z',
+      'total': 45.99,
+      'cart': {'1': 1, '2': 1},
+    },
+    {
+      'id': 'ORD-001235',
+      'status': 'Delivered',
+      'items': ['Aspirin 75mg x 90'],
+      'date': '2026-03-15T00:00:00Z',
+      'total': 12.99,
+      'cart': {'3': 1},
+    },
+  ];
+
   @override
   Widget build(BuildContext context) {
-    // Merged mock data from user's version
-    final orders = [
-      {
-        'id': 'ORD-2026-001',
-        'status': 'Delivered',
-        'items': ['Paracetamol 500mg x 2', 'Vitamin C Supplements x 1'],
-        'date': '2026-03-28T10:00:00Z',
-        'total': 24.50,
-      },
-      {
-        'id': 'ORD-2026-002',
-        'status': 'Processing',
-        'items': ['Cough Syrup 100ml x 1'],
-        'date': '2026-04-05T14:30:00Z',
-        'total': 12.00,
-      },
-    ];
-
     return Scaffold(
       backgroundColor: AppColors.warmWhite,
       appBar: AppBar(
@@ -42,13 +45,15 @@ class OrderHistoryScreen extends StatelessWidget {
       ),
       body: ListView.separated(
         padding: const EdgeInsets.all(16),
-        itemCount: orders.length,
+        itemCount: _orders.length,
         separatorBuilder: (_, __) => const SizedBox(height: 12),
         itemBuilder: (context, index) {
-          final order = orders[index];
-          final items = order['items'] as List<String>;
+          final order = _orders[index];
+          final items = (order['items'] as List<dynamic>).cast<String>();
           final status = order['status'] as String;
           final isDelivered = status == 'Delivered';
+          final statusBg = isDelivered ? const Color(0xFFD5F2DE) : const Color(0xFFF7E4BE);
+          final statusText = isDelivered ? const Color(0xFF2E7D32) : AppColors.accent;
 
           return Container(
             padding: const EdgeInsets.all(16),
@@ -61,26 +66,29 @@ class OrderHistoryScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      order['id'] as String,
-                      style: const TextStyle(
-                        color: AppColors.brownLight,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
+                    Expanded(
+                      child: Text(
+                        order['id'] as String,
+                        style: const TextStyle(
+                          color: AppColors.brownLight,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
                       decoration: BoxDecoration(
-                        color: isDelivered ? const Color(0xFFD5F2DE) : const Color(0xFFF7E4BE),
+                        color: statusBg,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
                         status,
                         style: TextStyle(
-                          color: isDelivered ? const Color(0xFF2E7D32) : AppColors.accent,
+                          color: statusText,
                           fontSize: 11,
                           fontWeight: FontWeight.w500,
                         ),
@@ -89,28 +97,35 @@ class OrderHistoryScreen extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 12),
-                ...items.map((item) => Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: Text(
-                        item,
-                        style: const TextStyle(
-                          color: AppColors.brownDeep,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
+                ...items.map(
+                  (item) => Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text(
+                      item,
+                      style: const TextStyle(
+                        color: AppColors.brownDeep,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
                       ),
-                    )),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 8),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      _formatDate(order['date'] as String),
-                      style: const TextStyle(
-                        color: AppColors.brownMid,
-                        fontSize: 12,
+                    Expanded(
+                      child: Text(
+                        _formatDate(order['date'] as String),
+                        style: const TextStyle(
+                          color: AppColors.brownMid,
+                          fontSize: 12,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    const SizedBox(width: 8),
                     Text(
                       '\$${(order['total'] as double).toStringAsFixed(2)}',
                       style: const TextStyle(
@@ -125,7 +140,18 @@ class OrderHistoryScreen extends StatelessWidget {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: () {},
+                    onPressed: () {
+                      final cart = Map<String, int>.from(order['cart'] as Map);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => OrderMedicinesScreen(
+                            initialCart: cart,
+                            initialOrderId: order['id'] as String,
+                          ),
+                        ),
+                      );
+                    },
                     icon: const Icon(Icons.refresh, size: 16),
                     label: const Text('Reorder'),
                     style: ElevatedButton.styleFrom(
@@ -150,7 +176,20 @@ class OrderHistoryScreen extends StatelessWidget {
   String _formatDate(String isoString) {
     try {
       final date = DateTime.parse(isoString);
-      final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const months = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ];
       return '${months[date.month - 1]} ${date.day}, ${date.year}';
     } catch (_) {
       return isoString;

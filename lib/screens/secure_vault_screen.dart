@@ -24,7 +24,7 @@ class _SecureVaultScreenState extends State<SecureVaultScreen> {
   Future<void> _addFile() async {
     try {
       // Use file_picker which works on both Mobile and Web
-      FilePickerResult? result = await FilePicker.pickFiles(
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
       );

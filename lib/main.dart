@@ -12,8 +12,6 @@ import 'screens/faq_screen.dart';
 import 'screens/hospital_list_screen.dart';
 import 'screens/doctor_list_screen.dart';
 import 'screens/search_results_screen.dart';
-import 'screens/my_information_screen.dart';
-import 'screens/order_history_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,6 +30,15 @@ class VitaDataApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'VITADATA',
       theme: AppTheme.lightTheme,
+      builder: (context, child) {
+        final mediaQuery = MediaQuery.of(context);
+        final currentScale = mediaQuery.textScaler.scale(1.0);
+        final clampedScale = currentScale.clamp(0.9, 1.0).toDouble();
+        return MediaQuery(
+          data: mediaQuery.copyWith(textScaler: TextScaler.linear(clampedScale)),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       initialRoute: '/',
       onGenerateRoute: (settings) {
         switch (settings.name) {
