@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/app_colors.dart';
+import '../core/api_service.dart';
+import '../core/session_store.dart';
 import '../widgets/auth_header.dart';
 
 class OTPVerificationScreen extends StatefulWidget {
@@ -15,6 +17,8 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
   final List<FocusNode> _focusNodes = List.generate(6, (index) => FocusNode());
   String _phoneNumber = "";
   bool _isValid = false;
+  bool _isLoading = false;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -69,10 +73,28 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
     }
   }
 
-  void _verifyOTP() {
-    if (_isValid) {
-      // Simulate successful verification and move to Profile Setup
-      Navigator.pushNamed(context, '/profile-setup');
+  void _verifyOTP() async {
+    if (_isValid && SessionStore.otpToken != null) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+
+      final otp = _controllers.map((c) => c.text).join();
+      final response = await ApiService.verifyOtp(otp, SessionStore.otpToken!);
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (response['status'] == 'OK') {
+        if (!mounted) return;
+        Navigator.pushNamed(context, '/profile-setup');
+      } else {
+        setState(() {
+          _errorMessage = response['message'] ?? 'Invalid OTP';
+        });
+      }
     }
   }
 
@@ -184,30 +206,39 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
                       ],
                     ),
                   ),
+                  if (_errorMessage != null) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      _errorMessage!,
+                      style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
+                    ),
+                  ],
                   const SizedBox(height: 48),
                   SizedBox(
                     width: double.infinity,
                     height: 56,
                     child: ElevatedButton(
-                      onPressed: _isValid ? _verifyOTP : null,
+                      onPressed: (_isValid && !_isLoading) ? _verifyOTP : null,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: _isValid 
+                        backgroundColor: (_isValid && !_isLoading) 
                           ? AppColors.accent 
                           : AppColors.accent.withOpacity(0.5),
                         disabledBackgroundColor: AppColors.accent.withOpacity(0.5),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(28),
                         ),
-                        elevation: _isValid ? 4 : 0,
+                        elevation: (_isValid && !_isLoading) ? 4 : 0,
                       ),
-                      child: const Text(
-                        'Submit',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                      child: _isLoading 
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text(
+                            'Submit',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                     ),
                   ),
                 ],

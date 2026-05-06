@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/app_colors.dart';
 import '../core/session_store.dart';
+import '../core/api_service.dart';
 import '../widgets/auth_header.dart';
 
 class PhoneInputScreen extends StatefulWidget {
@@ -15,6 +16,7 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
   final TextEditingController _phoneController = TextEditingController();
   String? _errorMessage;
   bool _isValid = false;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -32,18 +34,36 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
     }
   }
 
-  void _validateAndSendOTP() {
+  void _validateAndSendOTP() async {
     if (_isValid) {
       setState(() {
         _errorMessage = null;
+        _isLoading = true;
       });
-      SessionStore.phoneNumber = '+91 ${_phoneController.text.trim()}';
-      SystemSound.play(SystemSoundType.alert);
-      Navigator.pushNamed(
-        context,
-        '/otp-verification',
-        arguments: _phoneController.text.trim(),
-      );
+
+      final phoneNumber = _phoneController.text.trim();
+      final response = await ApiService.sendOtp(phoneNumber);
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (response['status'] == 'otp send' || response['status'] == 'OK') {
+        SessionStore.phoneNumber = '+91 $phoneNumber';
+        SessionStore.otpToken = response['token'];
+        SystemSound.play(SystemSoundType.alert);
+        
+        if (!mounted) return;
+        Navigator.pushNamed(
+          context,
+          '/otp-verification',
+          arguments: phoneNumber,
+        );
+      } else {
+        setState(() {
+          _errorMessage = response['message'] ?? 'Failed to send OTP';
+        });
+      }
     } else {
       setState(() {
         _errorMessage = 'Please enter a valid 10-digit mobile number';
@@ -125,14 +145,16 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
                         ),
                         elevation: _isValid ? 4 : 0,
                       ),
-                      child: const Text(
-                        'Send OTP',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                      child: _isLoading 
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text(
+                            'Send OTP',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                     ),
                   ),
                 ],
