@@ -83,10 +83,10 @@ class PrescriptionsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _HistoryRecordsPage(
+    return const _HistoryRecordsPage(
       title: 'Prescriptions',
       searchHint: 'Search prescriptions...',
-      records: const [
+      records: [
         _HistoryRecord(
           primary: 'Dr. Emily Martinez',
           secondary: 'Cardiologist',
@@ -115,10 +115,10 @@ class LabReportsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _HistoryRecordsPage(
+    return const _HistoryRecordsPage(
       title: 'Lab Reports',
       searchHint: 'Search lab reports...',
-      records: const [
+      records: [
         _HistoryRecord(
           primary: 'Complete Blood Count',
           secondary: 'Normal',
@@ -147,10 +147,10 @@ class AppointmentHistoryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _HistoryRecordsPage(
+    return const _HistoryRecordsPage(
       title: 'Appointment History',
       searchHint: 'Search appointments...',
-      records: const [
+      records: [
         _HistoryRecord(
           primary: 'Dr. Emily Martinez',
           secondary: 'Cardiologist',

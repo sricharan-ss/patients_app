@@ -65,7 +65,11 @@ class LandingPage extends StatelessWidget {
                     height: 54,
                     child: ElevatedButton(
                       onPressed: () {
-                        Navigator.pushNamed(context, '/phone-input');
+                        Navigator.pushNamed(
+                          context,
+                          '/phone-input',
+                          arguments: {'isLogin': false},
+                        );
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.cream,
@@ -88,7 +92,11 @@ class LandingPage extends StatelessWidget {
                   const SizedBox(height: 16),
                   GestureDetector(
                     onTap: () {
-                      Navigator.pushNamed(context, '/phone-input');
+                      Navigator.pushNamed(
+                        context,
+                        '/phone-input',
+                        arguments: {'isLogin': true},
+                      );
                     },
                     child: RichText(
                       text: const TextSpan(
@@ -171,7 +179,7 @@ class _FeatureIconsClusterState extends State<_FeatureIconsCluster> with SingleT
                 top: 0,
                 child: Transform.translate(
                   offset: _floatingOffset(t, 0),
-                  child: _IconBadge(
+                  child: const _IconBadge(
                     icon: Icons.health_and_safety_outlined,
                     color: AppColors.cream,
                     size: 56,
@@ -185,7 +193,7 @@ class _FeatureIconsClusterState extends State<_FeatureIconsCluster> with SingleT
                   offset: _floatingOffset(t, 1),
                   child: Transform.rotate(
                     angle: math.pi / 12,
-                    child: _IconBadge(
+                    child: const _IconBadge(
                       icon: Icons.medical_services_outlined,
                       color: AppColors.accent,
                       size: 54,
@@ -198,7 +206,7 @@ class _FeatureIconsClusterState extends State<_FeatureIconsCluster> with SingleT
                 bottom: 3,
                 child: Transform.translate(
                   offset: _floatingOffset(t, 2),
-                  child: _IconBadge(
+                  child: const _IconBadge(
                     icon: Icons.notification_important_outlined,
                     color: AppColors.surface,
                     size: 47,
@@ -212,7 +220,7 @@ class _FeatureIconsClusterState extends State<_FeatureIconsCluster> with SingleT
                   offset: _floatingOffset(t, 3),
                   child: Transform.rotate(
                     angle: -math.pi / 13,
-                    child: _IconBadge(
+                    child: const _IconBadge(
                       icon: Icons.monitor_heart_outlined,
                       color: AppColors.brownLight,
                       size: 48,

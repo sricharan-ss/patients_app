@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
+import '../core/session_store.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -42,6 +43,15 @@ class SettingsScreen extends StatelessWidget {
                 icon: Icons.palette_outlined,
                 label: 'Theme',
                 onTap: () => Navigator.pushNamed(context, '/appearance'),
+              ),
+              const SizedBox(height: 10),
+              _MenuCard(
+                icon: Icons.logout,
+                label: 'Logout',
+                onTap: () {
+                  SessionStore.logout();
+                  Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+                },
               ),
               const SizedBox(height: 16),
               const Text(

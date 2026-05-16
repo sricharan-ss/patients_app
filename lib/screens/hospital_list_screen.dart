@@ -59,7 +59,9 @@ class _HospitalListScreenState extends State<HospitalListScreen> {
 
   List<String> get _allLocations {
     final locs = <String>{};
-    for (final h in _hospitals) locs.add(h.location);
+    for (final h in _hospitals) {
+      locs.add(h.location);
+    }
     return locs.toList()..sort();
   }
 
@@ -323,13 +325,13 @@ class _HospitalListScreenState extends State<HospitalListScreen> {
             if (widget.nearbyOnly)
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                color: const Color(0xFFE8F5E9),
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                color: Color(0xFFE8F5E9),
                 child: Row(
-                  children: [
-                    const Icon(Icons.location_on, color: Color(0xFF2E7D32), size: 16),
-                    const SizedBox(width: 8),
-                    const Expanded(
+                  children: const [
+                    Icon(Icons.location_on, color: Color(0xFF2E7D32), size: 16),
+                    SizedBox(width: 8),
+                    Expanded(
                       child: Text(
                         'Showing hospitals sorted by distance from your location',
                         style: TextStyle(

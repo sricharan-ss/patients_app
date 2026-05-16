@@ -284,7 +284,7 @@ class _OrderMedicinesScreenState extends State<OrderMedicinesScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    _InfoCard(
+                    const _InfoCard(
                       title: 'Home',
                       subtitle: '123 Main Street, Apt 4B\nNew York, NY 10001',
                       actionLabel: 'Change Address',
@@ -299,7 +299,7 @@ class _OrderMedicinesScreenState extends State<OrderMedicinesScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    _InfoCard(
+                    const _InfoCard(
                       title: 'Credit Card',
                       subtitle: '**** **** **** 4242',
                       actionLabel: 'Change Payment',

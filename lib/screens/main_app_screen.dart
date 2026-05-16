@@ -29,7 +29,6 @@ class _MainAppScreenState extends State<MainAppScreen> {
     if (_locationChecked) return;
     _locationChecked = true;
 
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     LocationPermission permission = await Geolocator.checkPermission();
 
     if (permission == LocationPermission.denied) {
@@ -49,8 +48,8 @@ class _MainAppScreenState extends State<MainAppScreen> {
                 Container(
                   width: 64,
                   height: 64,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE8F5E9),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFE8F5E9),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(Icons.location_on, color: Color(0xFF2E7D32), size: 32),
@@ -155,11 +154,11 @@ class _HomeTab extends StatelessWidget {
           const _HomeHeader(),
           const SizedBox(height: 24),
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const _SectionHeader(title: 'Your Appointments', onSeeAll: null),
+                _SectionHeader(title: 'Your Appointments', onSeeAll: null),
                 const SizedBox(height: 12),
                 const _AppointmentCard(
                   doctorName: 'Dr. Emily Martinez',
@@ -779,9 +778,9 @@ class _MedicationCard extends StatelessWidget {
             // Orange left accent bar
             Container(
               width: 5,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: AppColors.accent,
-                borderRadius: const BorderRadius.only(
+                borderRadius: BorderRadius.only(
                   topLeft: Radius.circular(16),
                   bottomLeft: Radius.circular(16),
                 ),
@@ -862,38 +861,38 @@ class _RecentOrderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
+      padding: EdgeInsets.all(16),
+      decoration: const BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.surface),
+        borderRadius: BorderRadius.all(Radius.circular(16)),
+        border: Border(top: BorderSide(color: AppColors.surface), left: BorderSide(color: AppColors.surface), right: BorderSide(color: AppColors.surface), bottom: BorderSide(color: AppColors.surface)),
       ),
       child: Row(
         children: [
-          Expanded(
+          const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
+                    Text(
                       'Recent Order',
                       style: TextStyle(color: AppColors.brownDeep, fontSize: 15, fontWeight: FontWeight.w700),
                     ),
                     Text(
                       'ORD-001234',
-                      style: const TextStyle(color: AppColors.accent, fontSize: 13, fontWeight: FontWeight.w600),
+                      style: TextStyle(color: AppColors.accent, fontSize: 13, fontWeight: FontWeight.w600),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                const Text(
+                SizedBox(height: 8),
+                Text(
                   'Metformin 500mg x 60',
                   style: TextStyle(color: AppColors.brownDeep, fontSize: 14, fontWeight: FontWeight.w500),
                 ),
-                const SizedBox(height: 4),
-                const Text(
+                SizedBox(height: 4),
+                Text(
                   'Out for Delivery',
                   style: TextStyle(color: AppColors.accent, fontSize: 13, fontWeight: FontWeight.w600),
                 ),
@@ -969,25 +968,3 @@ class _BottomNav extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────
 // Placeholder Tabs
 // ─────────────────────────────────────────────────────────────
-class _PlaceholderTab extends StatelessWidget {
-  final String label;
-  final IconData icon;
-
-  const _PlaceholderTab({required this.label, required this.icon});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, color: AppColors.brownMid, size: 64),
-          const SizedBox(height: 16),
-          Text(label, style: const TextStyle(color: AppColors.brownMid, fontSize: 22, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 8),
-          const Text('Coming soon', style: TextStyle(color: AppColors.brownLight)),
-        ],
-      ),
-    );
-  }
-}

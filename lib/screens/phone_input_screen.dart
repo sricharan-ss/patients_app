@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../core/app_colors.dart';
 import '../core/session_store.dart';
 import '../widgets/auth_header.dart';
+import '../services/auth_service.dart';
 
 class PhoneInputScreen extends StatefulWidget {
   const PhoneInputScreen({super.key});
@@ -12,19 +12,39 @@ class PhoneInputScreen extends StatefulWidget {
 }
 
 class _PhoneInputScreenState extends State<PhoneInputScreen> {
+  final TextEditingController _firstNameController = TextEditingController();
+  final TextEditingController _lastNameController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
   String? _errorMessage;
   bool _isValid = false;
+  bool _isLoading = false;
+  bool _isLogin = false;
 
   @override
   void initState() {
     super.initState();
+    _firstNameController.addListener(_checkValidity);
+    _lastNameController.addListener(_checkValidity);
     _phoneController.addListener(_checkValidity);
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final args = ModalRoute.of(context)?.settings.arguments;
+    if (args != null && args is Map<String, dynamic>) {
+      _isLogin = args['isLogin'] as bool? ?? false;
+      SessionStore.currentAuthFlow = _isLogin ? AuthFlow.login : AuthFlow.signup;
+      _checkValidity();
+    }
+  }
+
   void _checkValidity() {
-    final text = _phoneController.text.trim();
-    final isValidValue = text.length == 10 && RegExp(r'^[0-9]+$').hasMatch(text);
+    final phoneText = _phoneController.text.trim();
+    final phoneValid = phoneText.length == 10 && RegExp(r'^[0-9]+$').hasMatch(phoneText);
+    final nameValid = _isLogin ||
+        (_firstNameController.text.trim().isNotEmpty && _lastNameController.text.trim().isNotEmpty);
+    final isValidValue = phoneValid && nameValid;
     if (_isValid != isValidValue) {
       setState(() {
         _isValid = isValidValue;
@@ -32,28 +52,67 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
     }
   }
 
-  void _validateAndSendOTP() {
-    if (_isValid) {
+  Future<void> _validateAndSendOTP() async {
+    if (!_isValid) {
       setState(() {
-        _errorMessage = null;
+        _errorMessage = _isLogin
+            ? 'Please enter a valid 10-digit mobile number.'
+            : 'Please fill in your name and a valid 10-digit mobile number';
       });
-      SessionStore.phoneNumber = '+91 ${_phoneController.text.trim()}';
-      SystemSound.play(SystemSoundType.alert);
-      Navigator.pushNamed(
-        context,
-        '/otp-verification',
-        arguments: _phoneController.text.trim(),
-      );
-    } else {
+      return;
+    }
+
+    final phoneNumber = '+91${_phoneController.text.trim()}';
+    final firstName = _firstNameController.text.trim();
+    final lastName = _lastNameController.text.trim();
+    SessionStore.clearAuthAttempt();
+
+    setState(() {
+      _errorMessage = null;
+      _isLoading = true;
+    });
+
+    try {
+      if (_isLogin) {
+        final result = await AuthService.loginInitiate(phoneNumber: phoneNumber);
+        if (result.success && mounted) {
+          Navigator.pushNamed(context, '/otp-verification');
+        } else {
+          setState(() {
+            _errorMessage = result.message;
+            _isLoading = false;
+          });
+        }
+      } else {
+        final result = await AuthService.signupInitiate(
+          phoneNumber: phoneNumber,
+          firstName: firstName,
+          lastName: lastName,
+        );
+        if (result.success && mounted) {
+          Navigator.pushNamed(context, '/otp-verification');
+        } else {
+          setState(() {
+            _errorMessage = result.message;
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
       setState(() {
-        _errorMessage = 'Please enter a valid 10-digit mobile number';
+        _errorMessage = 'Failed to authenticate. Please try again.';
+        _isLoading = false;
       });
     }
   }
 
   @override
   void dispose() {
+    _firstNameController.removeListener(_checkValidity);
+    _lastNameController.removeListener(_checkValidity);
     _phoneController.removeListener(_checkValidity);
+    _firstNameController.dispose();
+    _lastNameController.dispose();
     _phoneController.dispose();
     super.dispose();
   }
@@ -65,19 +124,87 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            const AuthHeader(
-              title: 'Enter your mobile number',
-              subtitle: "We'll send you a verification code",
+            AuthHeader(
+              title: _isLogin ? 'Login with OTP' : 'Create your account',
+              subtitle: _isLogin ? 'Enter your registered phone number' : "Tell us who you are and we'll send a code",
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (!_isLogin) ...[
+                    const Text(
+                      'First Name',
+                      style: TextStyle(
+                        color: AppColors.brownMid,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _firstNameController,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: InputDecoration(
+                        hintText: 'Enter first name',
+                        hintStyle: const TextStyle(color: Colors.black26),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                        filled: true,
+                        fillColor: AppColors.cream,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(15),
+                          borderSide: const BorderSide(color: AppColors.surface),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(15),
+                          borderSide: const BorderSide(color: AppColors.surface),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(15),
+                          borderSide: const BorderSide(color: AppColors.accent, width: 2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Last Name',
+                      style: TextStyle(
+                        color: AppColors.brownMid,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _lastNameController,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: InputDecoration(
+                        hintText: 'Enter last name',
+                        hintStyle: const TextStyle(color: Colors.black26),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                        filled: true,
+                        fillColor: AppColors.cream,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(15),
+                          borderSide: const BorderSide(color: AppColors.surface),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(15),
+                          borderSide: const BorderSide(color: AppColors.surface),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(15),
+                          borderSide: const BorderSide(color: AppColors.accent, width: 2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
                   const Text(
                     'Phone Number',
                     style: TextStyle(
-                      color: AppColors.brownMid, // Using specified BrownMid for labels
+                      color: AppColors.brownMid,
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
                     ),
@@ -93,10 +220,10 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
                       counterText: "",
                       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
                       filled: true,
-                      fillColor: AppColors.cream, // Specification: Color(0xFFFBF6EC)
+                      fillColor: AppColors.cream,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(15),
-                        borderSide: const BorderSide(color: AppColors.surface), // Specification: Color(0xFFEFE2CC)
+                        borderSide: const BorderSide(color: AppColors.surface),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(15),
@@ -109,30 +236,41 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
                       errorText: _errorMessage,
                     ),
                   ),
-                  const SizedBox(height: 48),
+                  if (_errorMessage != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      _errorMessage!,
+                      style: const TextStyle(color: Colors.redAccent, fontSize: 14),
+                    ),
+                  ],
+                  const SizedBox(height: 28),
                   SizedBox(
                     width: double.infinity,
                     height: 56,
                     child: ElevatedButton(
-                      onPressed: _isValid ? _validateAndSendOTP : null, // Disable until valid
+                      onPressed: _isValid && !_isLoading ? _validateAndSendOTP : null,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: _isValid 
-                          ? AppColors.accent 
-                          : AppColors.accent.withOpacity(0.5), // Lighter until 10 digits
+                        backgroundColor: _isValid
+                            ? AppColors.accent
+                            : AppColors.accent.withOpacity(0.5),
                         disabledBackgroundColor: AppColors.accent.withOpacity(0.5),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(28),
                         ),
                         elevation: _isValid ? 4 : 0,
                       ),
-                      child: const Text(
-                        'Send OTP',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                      child: _isLoading
+                          ? const CircularProgressIndicator(
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            )
+                          : Text(
+                              _isLogin ? 'Login with OTP' : 'Send OTP',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                     ),
                   ),
                 ],

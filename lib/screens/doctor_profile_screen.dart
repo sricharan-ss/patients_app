@@ -451,11 +451,11 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                         const SizedBox(height: 16),
 
                         // Practice Hours
-                        Row(
+                        const Row(
                           children: [
-                            const Icon(Icons.calendar_month, color: Color(0xFF3B1F0A), size: 16),
-                            const SizedBox(width: 8),
-                            const Text(
+                            Icon(Icons.calendar_month, color: Color(0xFF3B1F0A), size: 16),
+                            SizedBox(width: 8),
+                            Text(
                               'Practice Hours',
                               style: TextStyle(
                                 color: Color(0xFF3B1F0A),

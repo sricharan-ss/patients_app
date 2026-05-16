@@ -77,7 +77,9 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
 
   List<String> get _allSpecialties {
     final s = <String>{};
-    for (final d in _doctors) s.add(d.specialty);
+    for (final d in _doctors) {
+      s.add(d.specialty);
+    }
     return s.toList()..sort();
   }
 

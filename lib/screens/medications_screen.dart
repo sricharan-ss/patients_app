@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../core/app_colors.dart';
 import 'refill_page_screen.dart';
 import 'order_medicines_screen.dart';
 import 'order_tracking_screen.dart';
@@ -196,7 +195,7 @@ class MedicationsScreen extends StatelessWidget {
                     ],
                   ),
                 );
-              }).toList(),
+              }),
               const SizedBox(height: 16),
 
               // Refill Alerts
@@ -263,7 +262,7 @@ class MedicationsScreen extends StatelessWidget {
                       ],
                     ),
                   );
-                }).toList(),
+                }),
                 const SizedBox(height: 16),
               ],
 
@@ -361,7 +360,7 @@ class MedicationsScreen extends StatelessWidget {
                     ),
                   ),
                 );
-              }).toList(),
+              }),
             ],
           ),
         ),

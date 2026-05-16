@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
+import '../core/session_store.dart';
 
 class ProfileSetupScreen extends StatefulWidget {
   const ProfileSetupScreen({super.key});
@@ -14,6 +15,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final List<String> _bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
   final List<String> _chronicConditions = ['Diabetes Type 2', 'Hypertension', 'Asthma', 'Allergies'];
   final Set<String> _selectedConditions = {'Hypertension', 'Allergies'};
+  final TextEditingController _fullNameController = TextEditingController();
+  final TextEditingController _ageController = TextEditingController();
   final TextEditingController _customConditionController = TextEditingController();
 
   void _toggleCondition(String condition) {
@@ -37,6 +40,14 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         _customConditionController.clear();
       });
     }
+  }
+
+  @override
+  void dispose() {
+    _fullNameController.dispose();
+    _ageController.dispose();
+    _customConditionController.dispose();
+    super.dispose();
   }
 
   @override
@@ -72,7 +83,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
               // Full Name
               const _Label('Full Name'),
               const SizedBox(height: 8),
-              _CustomTextField(hint: 'Enter your name'),
+              _CustomTextField(controller: _fullNameController, hint: 'Enter your name'),
               const SizedBox(height: 16),
 
               // Age and Blood Group
@@ -85,7 +96,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                       children: [
                         const _Label('Age'),
                         const SizedBox(height: 8),
-                        _CustomTextField(hint: '32', keyboardType: TextInputType.number),
+                        _CustomTextField(hint: '32', keyboardType: TextInputType.number, controller: _ageController),
                       ],
                     ),
                   ),
@@ -169,6 +180,16 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                 height: 52,
                 child: ElevatedButton(
                   onPressed: () {
+                    final phoneNumber = SessionStore.phoneNumber;
+                    SessionStore.registerUser(phoneNumber, {
+                      'firstName': SessionStore.firstName,
+                      'lastName': SessionStore.lastName,
+                      'fullName': _fullNameController.text.trim(),
+                      'age': _ageController.text.trim(),
+                      'gender': _selectedGender,
+                      'bloodGroup': _selectedBloodGroup,
+                      'chronicConditions': _selectedConditions.toList(),
+                    });
                     Navigator.pushNamedAndRemoveUntil(context, '/main-app', (route) => false);
                   },
                   style: ElevatedButton.styleFrom(

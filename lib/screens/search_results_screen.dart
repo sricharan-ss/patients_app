@@ -222,7 +222,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                           child: Container(
                             width: 22,
                             height: 22,
-                            margin: const EdgeInsets.only(right: 10),
+                            margin: EdgeInsets.only(right: 10),
                             decoration: BoxDecoration(
                               color: AppColors.surface,
                               shape: BoxShape.circle,
@@ -261,10 +261,10 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
-                children: [
+                children: const [
                   Icon(Icons.history, color: AppColors.brownLight, size: 16),
-                  const SizedBox(width: 6),
-                  const Text(
+                  SizedBox(width: 6),
+                  Text(
                     'Recent Searches',
                     style: TextStyle(
                       color: AppColors.brownDeep,
@@ -297,11 +297,11 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
         ],
 
         // Trending Specialties
-        Row(
+        const Row(
           children: [
             Icon(Icons.trending_up, color: AppColors.brownLight, size: 16),
-            const SizedBox(width: 6),
-            const Text(
+            SizedBox(width: 6),
+            Text(
               'Trending Specialties',
               style: TextStyle(
                 color: AppColors.brownDeep,

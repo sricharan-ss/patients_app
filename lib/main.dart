@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'core/app_theme.dart';
+import 'core/session_store.dart';
 import 'screens/landing_page.dart';
 import 'screens/phone_input_screen.dart';
 import 'screens/otp_verification_screen.dart';
@@ -39,7 +40,7 @@ class VitaDataApp extends StatelessWidget {
           child: child ?? const SizedBox.shrink(),
         );
       },
-      initialRoute: '/',
+      initialRoute: SessionStore.isLoggedIn ? '/main-app' : '/',
       onGenerateRoute: (settings) {
         switch (settings.name) {
           case '/':
@@ -79,3 +80,4 @@ class VitaDataApp extends StatelessWidget {
     );
   }
 }
+
