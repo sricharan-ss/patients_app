@@ -271,7 +271,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(28),
                         ),
-                        elevation: _isValid ? 4 : 0,
+                        elevation: (_isValid && !_isLoading) ? 4 : 0,
                       ),
                       child: _isLoading
                           ? const CircularProgressIndicator(

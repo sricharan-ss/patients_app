@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/session_store.dart';
+import '../core/api_service.dart';
 import '../widgets/auth_header.dart';
 import '../services/auth_service.dart';
 
