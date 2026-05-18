@@ -10,6 +10,7 @@ class SessionStore {
   static String firstName = '';
   static String lastName = '';
   static String? verificationToken;
+  static String? devOtp;
   static String? accessToken;
   static AuthFlow currentAuthFlow = AuthFlow.signup;
 
@@ -31,6 +32,7 @@ class SessionStore {
 
   static void clearAuthAttempt() {
     verificationToken = null;
+    devOtp = null;
     currentAuthFlow = AuthFlow.signup;
   }
 

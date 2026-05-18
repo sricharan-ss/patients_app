@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  static const String baseUrl = 'http://localhost:5000/api'; // Update this for production
+  static const baseUrl = "http://localhost:5000";
 
   static Future<Map<String, dynamic>> sendOtp(String phoneNumber) async {
     // Ensure the phone number starts with +91

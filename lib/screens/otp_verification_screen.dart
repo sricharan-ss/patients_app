@@ -37,6 +37,11 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
     super.didChangeDependencies();
     _phoneNumber = SessionStore.phoneNumber.replaceFirst('+91', '').trim();
     _isLogin = SessionStore.currentAuthFlow == AuthFlow.login;
+    final devOtp = SessionStore.devOtp;
+    if (devOtp != null && devOtp.isNotEmpty && _statusMessage == null) {
+      _statusMessage = 'Development OTP: $devOtp';
+      _statusIsError = false;
+    }
   }
 
   void _checkValidity() {

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 import '../core/backend_config.dart';
 import '../core/session_store.dart';
@@ -35,10 +36,11 @@ class AuthService {
       final verificationToken = _readString(response.decoded, 'token');
       if (verificationToken != null && verificationToken.isNotEmpty) {
         SessionStore.verificationToken = verificationToken;
+        SessionStore.devOtp = _readString(response.decoded, 'devOtp');
         final backendMessage = _readString(response.decoded, 'message') ??
             'OTP sent to your phone.';
         return SignupInitResult.success(
-          message: backendMessage,
+          message: _withDevOtp(backendMessage),
           verificationToken: verificationToken,
         );
       }
@@ -71,9 +73,11 @@ class AuthService {
       final verificationToken = _readString(response.decoded, 'token');
       if (verificationToken != null && verificationToken.isNotEmpty) {
         SessionStore.verificationToken = verificationToken;
+        SessionStore.devOtp = _readString(response.decoded, 'devOtp');
         return LoginInitResult.success(
-          message:
-              _readString(response.decoded, 'message') ?? 'OTP sent to your phone.',
+          message: _withDevOtp(
+            _readString(response.decoded, 'message') ?? 'OTP sent to your phone.',
+          ),
           verificationToken: verificationToken,
         );
       }
@@ -195,9 +199,9 @@ class AuthService {
       }
     }
 
-    return _BackendResponse(
+    return const _BackendResponse(
       statusCode: 500,
-      decoded: const <String, dynamic>{},
+      decoded: <String, dynamic>{},
       networkError: 'Unable to process request.',
     );
   }
@@ -207,37 +211,46 @@ class AuthService {
     Map<String, dynamic> payload, {
     String? bearerToken,
   }) async {
-    final client = HttpClient();
     try {
-      final request = await client.postUrl(_uri(path));
-      request.headers.contentType = ContentType.json;
+      final headers = {
+        'Content-Type': 'application/json',
+      };
       if (bearerToken != null && bearerToken.isNotEmpty) {
-        request.headers.set('Authorization', 'Bearer $bearerToken');
+        headers['Authorization'] = 'Bearer $bearerToken';
       }
-      request.write(jsonEncode(payload));
 
-      final response = await request.close();
-      final body = await response.transform(utf8.decoder).join();
-      final decoded = _decodeMap(body);
+      final response = await http.post(
+        _uri(path),
+        headers: headers,
+        body: jsonEncode(payload),
+      );
+
+      final decoded = _decodeMap(response.body);
       return _BackendResponse(
         statusCode: response.statusCode,
         decoded: decoded,
       );
-    } on SocketException {
+    } catch (e) {
+      final errorStr = e.toString().toLowerCase();
+      final isNetworkError = errorStr.contains('socketexception') ||
+          errorStr.contains('failed host lookup') ||
+          errorStr.contains('clientexception') ||
+          errorStr.contains('connection refused') ||
+          errorStr.contains('xmlhttprequest error');
+
+      if (isNetworkError) {
+        return _BackendResponse(
+          statusCode: 0,
+          decoded: const <String, dynamic>{},
+          networkError:
+              'Unable to reach backend at $_effectiveBaseUrl. Make sure the server is running.',
+        );
+      }
       return _BackendResponse(
         statusCode: 0,
         decoded: const <String, dynamic>{},
-        networkError:
-            'Unable to reach backend at $_effectiveBaseUrl. Make sure the server is running.',
+        networkError: 'Unexpected error while calling backend: $e',
       );
-    } catch (_) {
-      return _BackendResponse(
-        statusCode: 0,
-        decoded: const <String, dynamic>{},
-        networkError: 'Unexpected error while calling backend.',
-      );
-    } finally {
-      client.close(force: true);
     }
   }
 
@@ -258,6 +271,14 @@ class AuthService {
       return value;
     }
     return null;
+  }
+
+  static String _withDevOtp(String message) {
+    final devOtp = SessionStore.devOtp;
+    if (devOtp == null || devOtp.isEmpty) {
+      return message;
+    }
+    return '$message Development OTP: $devOtp';
   }
 
   static Future<bool> refreshToken() async {

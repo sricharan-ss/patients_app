@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'package:flutter/foundation.dart';
 
 class BackendConfig {
   const BackendConfig._();
@@ -11,8 +11,9 @@ class BackendConfig {
     }
 
     // Backend folder location does not matter; only reachable host/port matters.
-    final fallback =
-        Platform.isAndroid ? 'http://10.0.2.2:5000' : 'http://127.0.0.1:5000';
+    final fallback = (defaultTargetPlatform == TargetPlatform.android)
+        ? 'http://10.0.2.2:5000'
+        : 'http://127.0.0.1:5000';
     return _normalize(fallback);
   }
 
