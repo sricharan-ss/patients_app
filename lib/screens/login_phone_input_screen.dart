@@ -1,19 +1,18 @@
 import 'package:flutter/material.dart';
+
 import '../core/app_colors.dart';
 import '../core/session_store.dart';
-import '../widgets/auth_header.dart';
 import '../services/auth_service.dart';
+import '../widgets/auth_header.dart';
 
-class PhoneInputScreen extends StatefulWidget {
-  const PhoneInputScreen({super.key});
+class LoginPhoneInputScreen extends StatefulWidget {
+  const LoginPhoneInputScreen({super.key});
 
   @override
-  State<PhoneInputScreen> createState() => _PhoneInputScreenState();
+  State<LoginPhoneInputScreen> createState() => _LoginPhoneInputScreenState();
 }
 
-class _PhoneInputScreenState extends State<PhoneInputScreen> {
-  final TextEditingController _firstNameController = TextEditingController();
-  final TextEditingController _lastNameController = TextEditingController();
+class _LoginPhoneInputScreenState extends State<LoginPhoneInputScreen> {
   final TextEditingController _phoneController = TextEditingController();
   String? _errorMessage;
   bool _isValid = false;
@@ -22,37 +21,31 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
   @override
   void initState() {
     super.initState();
-    _firstNameController.addListener(_checkValidity);
-    _lastNameController.addListener(_checkValidity);
     _phoneController.addListener(_checkValidity);
-    SessionStore.currentAuthFlow = AuthFlow.signup;
+    SessionStore.currentAuthFlow = AuthFlow.login;
   }
 
   void _checkValidity() {
     final phoneText = _phoneController.text.trim();
     final phoneValid = phoneText.length == 10 && RegExp(r'^[0-9]+$').hasMatch(phoneText);
-    final nameValid =
-        _firstNameController.text.trim().isNotEmpty && _lastNameController.text.trim().isNotEmpty;
-    final isValidValue = phoneValid && nameValid;
-    if (_isValid != isValidValue) {
+    if (_isValid != phoneValid) {
       setState(() {
-        _isValid = isValidValue;
+        _isValid = phoneValid;
       });
     }
   }
 
-  Future<void> _validateAndSendOTP() async {
+  Future<void> _sendLoginOtp() async {
     if (!_isValid) {
       setState(() {
-        _errorMessage = 'Please fill in your name and a valid 10-digit mobile number';
+        _errorMessage = 'Please enter a valid 10-digit mobile number.';
       });
       return;
     }
 
     final phoneNumber = '+91${_phoneController.text.trim()}';
-    final firstName = _firstNameController.text.trim();
-    final lastName = _lastNameController.text.trim();
     SessionStore.clearAuthAttempt();
+    SessionStore.currentAuthFlow = AuthFlow.login;
 
     setState(() {
       _errorMessage = null;
@@ -60,11 +53,7 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
     });
 
     try {
-      final result = await AuthService.signupInitiate(
-        phoneNumber: phoneNumber,
-        firstName: firstName,
-        lastName: lastName,
-      );
+      final result = await AuthService.loginInitiate(phoneNumber: phoneNumber);
       if (result.success && mounted) {
         Navigator.pushNamed(context, '/otp-verification');
       } else {
@@ -73,9 +62,9 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
           _isLoading = false;
         });
       }
-    } catch (e) {
+    } catch (_) {
       setState(() {
-        _errorMessage = 'Failed to authenticate. Please try again.';
+        _errorMessage = 'Failed to send OTP. Please try again.';
         _isLoading = false;
       });
     }
@@ -83,11 +72,7 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
 
   @override
   void dispose() {
-    _firstNameController.removeListener(_checkValidity);
-    _lastNameController.removeListener(_checkValidity);
     _phoneController.removeListener(_checkValidity);
-    _firstNameController.dispose();
-    _lastNameController.dispose();
     _phoneController.dispose();
     super.dispose();
   }
@@ -100,80 +85,14 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
         child: Column(
           children: [
             const AuthHeader(
-              title: 'Create your account',
-              subtitle: "Tell us who you are and we'll send a code",
+              title: 'Login with OTP',
+              subtitle: 'Enter your registered phone number',
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'First Name',
-                    style: TextStyle(
-                      color: AppColors.brownMid,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _firstNameController,
-                    textCapitalization: TextCapitalization.words,
-                    decoration: InputDecoration(
-                      hintText: 'Enter first name',
-                      hintStyle: const TextStyle(color: Colors.black26),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-                      filled: true,
-                      fillColor: AppColors.cream,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(15),
-                        borderSide: const BorderSide(color: AppColors.surface),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(15),
-                        borderSide: const BorderSide(color: AppColors.surface),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(15),
-                        borderSide: const BorderSide(color: AppColors.accent, width: 2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  const Text(
-                    'Last Name',
-                    style: TextStyle(
-                      color: AppColors.brownMid,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _lastNameController,
-                    textCapitalization: TextCapitalization.words,
-                    decoration: InputDecoration(
-                      hintText: 'Enter last name',
-                      hintStyle: const TextStyle(color: Colors.black26),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-                      filled: true,
-                      fillColor: AppColors.cream,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(15),
-                        borderSide: const BorderSide(color: AppColors.surface),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(15),
-                        borderSide: const BorderSide(color: AppColors.surface),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(15),
-                        borderSide: const BorderSide(color: AppColors.accent, width: 2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
                   const Text(
                     'Phone Number',
                     style: TextStyle(
@@ -221,7 +140,7 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
                     width: double.infinity,
                     height: 56,
                     child: ElevatedButton(
-                      onPressed: _isValid && !_isLoading ? _validateAndSendOTP : null,
+                      onPressed: _isValid && !_isLoading ? _sendLoginOtp : null,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _isValid
                             ? AppColors.accent
@@ -236,9 +155,9 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
                           ? const CircularProgressIndicator(
                               valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                             )
-                          : Text(
-                              'Send OTP',
-                              style: const TextStyle(
+                          : const Text(
+                              'Login with OTP',
+                              style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 20,
                                 fontWeight: FontWeight.w600,

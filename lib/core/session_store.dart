@@ -9,6 +9,7 @@ class SessionStore {
   static String phoneNumber = '+910000000000';
   static String firstName = '';
   static String lastName = '';
+  static String email = '';
   static String? verificationToken;
   static String? devOtp;
   static String? accessToken;
@@ -30,6 +31,29 @@ class SessionStore {
 
   static bool get isLoggedIn => accessToken != null && accessToken!.isNotEmpty;
 
+  static String get fullName {
+    final direct = '$firstName $lastName'.trim();
+    if (direct.isNotEmpty) {
+      return direct;
+    }
+    final userData = registeredUsers[phoneNumber];
+    final fallbackFirst = (userData?['firstName'] as String?)?.trim() ?? '';
+    final fallbackLast = (userData?['lastName'] as String?)?.trim() ?? '';
+    final fallback = '$fallbackFirst $fallbackLast'.trim();
+    if (fallback.isNotEmpty) {
+      return fallback;
+    }
+    return 'User';
+  }
+
+  static String get profileInitial {
+    final name = fullName.trim();
+    if (name.isEmpty || name.toLowerCase() == 'user') {
+      return 'U';
+    }
+    return name[0].toUpperCase();
+  }
+
   static void clearAuthAttempt() {
     verificationToken = null;
     devOtp = null;
@@ -41,6 +65,7 @@ class SessionStore {
     phoneNumber = '+910000000000';
     firstName = '';
     lastName = '';
+    email = '';
     clearAuthAttempt();
   }
 }

@@ -65,11 +65,7 @@ class LandingPage extends StatelessWidget {
                     height: 54,
                     child: ElevatedButton(
                       onPressed: () {
-                        Navigator.pushNamed(
-                          context,
-                          '/phone-input',
-                          arguments: {'isLogin': false},
-                        );
+                        Navigator.pushNamed(context, '/phone-input');
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.cream,
@@ -92,11 +88,7 @@ class LandingPage extends StatelessWidget {
                   const SizedBox(height: 16),
                   GestureDetector(
                     onTap: () {
-                      Navigator.pushNamed(
-                        context,
-                        '/phone-input',
-                        arguments: {'isLogin': true},
-                      );
+                      Navigator.pushNamed(context, '/login-phone-input');
                     },
                     child: RichText(
                       text: const TextSpan(

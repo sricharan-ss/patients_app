@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/session_store.dart';
 import 'my_information_screen.dart';
 import 'order_history_screen.dart';
 import 'secure_vault_screen.dart';
@@ -8,6 +9,10 @@ class ProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fullName = SessionStore.fullName;
+    final profileInitial = SessionStore.profileInitial;
+    final email = SessionStore.email.isEmpty ? 'Not set' : SessionStore.email;
+    final phoneNumber = SessionStore.phoneNumber;
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -56,8 +61,8 @@ class ProfileScreen extends StatelessWidget {
                         shape: BoxShape.circle,
                       ),
                       alignment: Alignment.center,
-                      child: const Text(
-                        'C',
+                      child: Text(
+                        profileInitial,
                         style: TextStyle(
                           color: Color(0xFFFBF6EC),
                           fontSize: 28,
@@ -66,8 +71,8 @@ class ProfileScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    const Text(
-                      'Charan',
+                    Text(
+                      fullName,
                       style: TextStyle(
                         color: Color(0xFFFBF6EC),
                         fontSize: 20,
@@ -107,8 +112,8 @@ class ProfileScreen extends StatelessWidget {
                         details: [
                           {'label': 'Age', 'value': '28 years'},
                           {'label': 'Gender', 'value': 'Male'},
-                          {'label': 'Phone', 'value': '+91 98765 43210'},
-                          {'label': 'Email', 'value': 'charan@example.com'},
+                          {'label': 'Phone', 'value': phoneNumber},
+                          {'label': 'Email', 'value': email},
                         ],
                       ),
                       const SizedBox(height: 12),

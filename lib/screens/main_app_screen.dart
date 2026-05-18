@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import '../core/app_colors.dart';
+import '../core/session_store.dart';
 import '../screens/hospital_detail_screen.dart';
 import 'profile_screen.dart';
 import 'medications_screen.dart';
@@ -151,7 +152,7 @@ class _HomeTab extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _HomeHeader(),
+          _HomeHeader(),
           const SizedBox(height: 24),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -247,6 +248,8 @@ class _HomeHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fullName = SessionStore.fullName;
+    final profileInitial = SessionStore.profileInitial;
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
@@ -310,8 +313,8 @@ class _HomeHeader extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 2),
-                        const Text(
-                          'Charan',
+                        Text(
+                          fullName,
                           style: TextStyle(
                             color: AppColors.warmWhite,
                             fontSize: 24,
@@ -334,8 +337,8 @@ class _HomeHeader extends StatelessWidget {
                         shape: BoxShape.circle,
                       ),
                       alignment: Alignment.center,
-                      child: const Text(
-                        'S',
+                      child: Text(
+                        profileInitial,
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 20,

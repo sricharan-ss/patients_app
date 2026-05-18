@@ -123,9 +123,11 @@ class AuthService {
       final accessToken = _readString(response.decoded, 'accessToken');
       if (accessToken != null && accessToken.isNotEmpty) {
         SessionStore.accessToken = accessToken;
+        await _loadCurrentUserProfile(accessToken);
         SessionStore.registerUser(SessionStore.phoneNumber, {
           'firstName': SessionStore.firstName,
           'lastName': SessionStore.lastName,
+          'email': SessionStore.email,
         });
         SessionStore.verificationToken = null;
         return AuthResult.success(
@@ -183,6 +185,58 @@ class AuthService {
       return AuthResult.success(message: signupResult.message);
     }
     return AuthResult.failure(signupResult.message);
+  }
+
+  static Future<AuthResult> upsertMyPatientProfile({
+    required int age,
+    required String gender,
+    String? bloodGroup,
+    List<String>? chronicConditions,
+  }) async {
+    final accessToken = SessionStore.accessToken;
+    if (accessToken == null || accessToken.isEmpty) {
+      return AuthResult.failure('Not authenticated. Please login again.');
+    }
+
+    final response = await _put(
+      '/api/patients/me/profile',
+      {
+        'age': age,
+        'gender': gender,
+        if (bloodGroup != null && bloodGroup.isNotEmpty) 'bloodGroup': bloodGroup,
+        if (chronicConditions != null) 'chronicConditions': chronicConditions,
+      },
+      bearerToken: accessToken,
+    );
+
+    if (response.networkError != null) {
+      return AuthResult.failure(response.networkError!);
+    }
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final data = response.decoded['data'];
+      if (data is Map<String, dynamic>) {
+        SessionStore.registerUser(SessionStore.phoneNumber, {
+          'firstName': SessionStore.firstName,
+          'lastName': SessionStore.lastName,
+          'fullName': SessionStore.fullName,
+          'age': age.toString(),
+          'gender': gender,
+          'bloodGroup': bloodGroup,
+          'chronicConditions': chronicConditions ?? const <String>[],
+          'patientId': data['patientId'],
+        });
+      }
+      return AuthResult.success(
+        message: _readString(response.decoded, 'message') ??
+            'Patient profile saved successfully',
+      );
+    }
+
+    return AuthResult.failure(
+      _readString(response.decoded, 'message') ??
+          'Unable to save patient profile',
+    );
   }
 
   static Future<_BackendResponse> _postWithFallback({
@@ -246,6 +300,117 @@ class AuthService {
               'Unable to reach backend at $_effectiveBaseUrl. Make sure the server is running.',
         );
       }
+      return _BackendResponse(
+        statusCode: 0,
+        decoded: const <String, dynamic>{},
+        networkError: 'Unexpected error while calling backend: $e',
+      );
+    }
+  }
+
+  static Future<_BackendResponse> _put(
+    String path,
+    Map<String, dynamic> payload, {
+    String? bearerToken,
+  }) async {
+    try {
+      final headers = {
+        'Content-Type': 'application/json',
+      };
+      if (bearerToken != null && bearerToken.isNotEmpty) {
+        headers['Authorization'] = 'Bearer $bearerToken';
+      }
+
+      final response = await http.put(
+        _uri(path),
+        headers: headers,
+        body: jsonEncode(payload),
+      );
+
+      final decoded = _decodeMap(response.body);
+      return _BackendResponse(
+        statusCode: response.statusCode,
+        decoded: decoded,
+      );
+    } catch (e) {
+      final errorStr = e.toString().toLowerCase();
+      final isNetworkError = errorStr.contains('socketexception') ||
+          errorStr.contains('failed host lookup') ||
+          errorStr.contains('clientexception') ||
+          errorStr.contains('connection refused') ||
+          errorStr.contains('xmlhttprequest error');
+
+      if (isNetworkError) {
+        return _BackendResponse(
+          statusCode: 0,
+          decoded: const <String, dynamic>{},
+          networkError:
+              'Unable to reach backend at $_effectiveBaseUrl. Make sure the server is running.',
+        );
+      }
+      return _BackendResponse(
+        statusCode: 0,
+        decoded: const <String, dynamic>{},
+        networkError: 'Unexpected error while calling backend: $e',
+      );
+    }
+  }
+
+  static Future<void> _loadCurrentUserProfile(String accessToken) async {
+    final response = await _get(
+      '/api/users/myinfo',
+      bearerToken: accessToken,
+    );
+
+    if (response.statusCode != 200) {
+      return;
+    }
+
+    final data = response.decoded['data'];
+    if (data is! Map<String, dynamic>) {
+      return;
+    }
+
+    final firstName = _readString(data, 'firstName');
+    final lastName = _readString(data, 'lastName');
+    final phoneNumber = _readString(data, 'phoneNumber');
+    final email = _readString(data, 'email');
+
+    if (firstName != null && firstName.trim().isNotEmpty) {
+      SessionStore.firstName = firstName.trim();
+    }
+    if (lastName != null && lastName.trim().isNotEmpty) {
+      SessionStore.lastName = lastName.trim();
+    }
+    if (phoneNumber != null && phoneNumber.trim().isNotEmpty) {
+      SessionStore.phoneNumber = phoneNumber.trim();
+    }
+    if (email != null && email.trim().isNotEmpty) {
+      SessionStore.email = email.trim();
+    }
+  }
+
+  static Future<_BackendResponse> _get(
+    String path, {
+    String? bearerToken,
+  }) async {
+    try {
+      final headers = <String, String>{};
+      if (bearerToken != null && bearerToken.isNotEmpty) {
+        headers['Authorization'] = 'Bearer $bearerToken';
+      }
+
+      final response = await http.get(
+        _uri(path),
+        headers: headers,
+      );
+
+      final decoded = _decodeMap(response.body);
+      return _BackendResponse(
+        statusCode: response.statusCode,
+        decoded: decoded,
+      );
+    } catch (e) {
       return _BackendResponse(
         statusCode: 0,
         decoded: const <String, dynamic>{},

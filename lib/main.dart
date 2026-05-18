@@ -4,6 +4,7 @@ import 'core/app_theme.dart';
 import 'core/session_store.dart';
 import 'screens/landing_page.dart';
 import 'screens/phone_input_screen.dart';
+import 'screens/login_phone_input_screen.dart';
 import 'screens/otp_verification_screen.dart';
 import 'screens/profile_setup_screen.dart';
 import 'screens/main_app_screen.dart';
@@ -47,6 +48,8 @@ class VitaDataApp extends StatelessWidget {
             return MaterialPageRoute(builder: (_) => const LandingPage());
           case '/phone-input':
             return MaterialPageRoute(builder: (_) => const PhoneInputScreen());
+          case '/login-phone-input':
+            return MaterialPageRoute(builder: (_) => const LoginPhoneInputScreen());
           case '/otp-verification':
             return MaterialPageRoute(builder: (_) => const OTPVerificationScreen());
           case '/profile-setup':

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/session_store.dart';
+import '../services/auth_service.dart';
 
 class ProfileSetupScreen extends StatefulWidget {
   const ProfileSetupScreen({super.key});
@@ -15,9 +16,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final List<String> _bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
   final List<String> _chronicConditions = ['Diabetes Type 2', 'Hypertension', 'Asthma', 'Allergies'];
   final Set<String> _selectedConditions = {'Hypertension', 'Allergies'};
-  final TextEditingController _fullNameController = TextEditingController();
   final TextEditingController _ageController = TextEditingController();
   final TextEditingController _customConditionController = TextEditingController();
+  bool _isSaving = false;
+  String? _errorMessage;
 
   void _toggleCondition(String condition) {
     setState(() {
@@ -44,10 +46,103 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
   @override
   void dispose() {
-    _fullNameController.dispose();
     _ageController.dispose();
     _customConditionController.dispose();
     super.dispose();
+  }
+
+  String? _mapGenderToApi(String? genderLabel) {
+    switch ((genderLabel ?? '').toLowerCase()) {
+      case 'male':
+        return 'male';
+      case 'female':
+        return 'female';
+      case 'other':
+        return 'other';
+      default:
+        return null;
+    }
+  }
+
+  String? _mapBloodGroupToApi(String? bloodGroupLabel) {
+    switch (bloodGroupLabel) {
+      case 'A+':
+        return 'A_POSITIVE';
+      case 'A-':
+        return 'A_NEGATIVE';
+      case 'B+':
+        return 'B_POSITIVE';
+      case 'B-':
+        return 'B_NEGATIVE';
+      case 'AB+':
+        return 'AB_POSITIVE';
+      case 'AB-':
+        return 'AB_NEGATIVE';
+      case 'O+':
+        return 'O_POSITIVE';
+      case 'O-':
+        return 'O_NEGATIVE';
+      default:
+        return null;
+    }
+  }
+
+  Future<void> _saveProfileAndContinue() async {
+    final ageText = _ageController.text.trim();
+    final age = int.tryParse(ageText);
+    if (age == null || age < 0 || age > 130) {
+      setState(() {
+        _errorMessage = 'Please enter a valid age between 0 and 130.';
+      });
+      return;
+    }
+
+    final gender = _mapGenderToApi(_selectedGender);
+    if (gender == null) {
+      setState(() {
+        _errorMessage = 'Please select a valid gender.';
+      });
+      return;
+    }
+
+    final bloodGroup = _mapBloodGroupToApi(_selectedBloodGroup);
+    final chronicConditions = _selectedConditions.toList();
+
+    setState(() {
+      _isSaving = true;
+      _errorMessage = null;
+    });
+
+    final result = await AuthService.upsertMyPatientProfile(
+      age: age,
+      gender: gender,
+      bloodGroup: bloodGroup,
+      chronicConditions: chronicConditions,
+    );
+
+    if (!mounted) return;
+
+    if (!result.success) {
+      setState(() {
+        _isSaving = false;
+        _errorMessage = result.message;
+      });
+      return;
+    }
+
+    final phoneNumber = SessionStore.phoneNumber;
+    final fullName = '${SessionStore.firstName} ${SessionStore.lastName}'.trim();
+    SessionStore.registerUser(phoneNumber, {
+      'firstName': SessionStore.firstName,
+      'lastName': SessionStore.lastName,
+      'fullName': fullName,
+      'age': ageText,
+      'gender': _selectedGender,
+      'bloodGroup': _selectedBloodGroup,
+      'chronicConditions': chronicConditions,
+    });
+
+    Navigator.pushNamedAndRemoveUntil(context, '/main-app', (route) => false);
   }
 
   @override
@@ -79,12 +174,6 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                 ),
               ),
               const SizedBox(height: 18),
-
-              // Full Name
-              const _Label('Full Name'),
-              const SizedBox(height: 8),
-              _CustomTextField(controller: _fullNameController, hint: 'Enter your name'),
-              const SizedBox(height: 16),
 
               // Age and Blood Group
               Row(
@@ -173,39 +262,47 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                 ],
               ),
               const SizedBox(height: 20),
+              if (_errorMessage != null) ...[
+                Text(
+                  _errorMessage!,
+                  style: const TextStyle(
+                    color: Colors.redAccent,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
 
               // Continue Button
               SizedBox(
                 width: double.infinity,
                 height: 52,
                 child: ElevatedButton(
-                  onPressed: () {
-                    final phoneNumber = SessionStore.phoneNumber;
-                    SessionStore.registerUser(phoneNumber, {
-                      'firstName': SessionStore.firstName,
-                      'lastName': SessionStore.lastName,
-                      'fullName': _fullNameController.text.trim(),
-                      'age': _ageController.text.trim(),
-                      'gender': _selectedGender,
-                      'bloodGroup': _selectedBloodGroup,
-                      'chronicConditions': _selectedConditions.toList(),
-                    });
-                    Navigator.pushNamedAndRemoveUntil(context, '/main-app', (route) => false);
-                  },
+                  onPressed: _isSaving ? null : _saveProfileAndContinue,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.brownDeep,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
                   ),
-                  child: const Text(
-                    'Continue',
-                    style: TextStyle(
-                      color: AppColors.warmWhite,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+                  child: _isSaving
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.warmWhite),
+                          ),
+                        )
+                      : const Text(
+                          'Continue',
+                          style: TextStyle(
+                            color: AppColors.warmWhite,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(height: 8),
