@@ -124,11 +124,6 @@ class AuthService {
       if (accessToken != null && accessToken.isNotEmpty) {
         SessionStore.accessToken = accessToken;
         await _loadCurrentUserProfile(accessToken);
-        SessionStore.registerUser(SessionStore.phoneNumber, {
-          'firstName': SessionStore.firstName,
-          'lastName': SessionStore.lastName,
-          'email': SessionStore.email,
-        });
         SessionStore.verificationToken = null;
         return AuthResult.success(
           message: _readString(response.decoded, 'message') ?? 'Authentication successful',
@@ -190,6 +185,8 @@ class AuthService {
   static Future<AuthResult> upsertMyPatientProfile({
     required int age,
     required String gender,
+    String? email,
+    String? emergencyContact,
     String? bloodGroup,
     List<String>? chronicConditions,
   }) async {
@@ -203,6 +200,8 @@ class AuthService {
       {
         'age': age,
         'gender': gender,
+        if (email != null && email.isNotEmpty) 'email': email,
+        if (emergencyContact != null && emergencyContact.isNotEmpty) 'emergencyContact': emergencyContact,
         if (bloodGroup != null && bloodGroup.isNotEmpty) 'bloodGroup': bloodGroup,
         if (chronicConditions != null) 'chronicConditions': chronicConditions,
       },
@@ -216,17 +215,9 @@ class AuthService {
     if (response.statusCode == 200 || response.statusCode == 201) {
       final data = response.decoded['data'];
       if (data is Map<String, dynamic>) {
-        SessionStore.registerUser(SessionStore.phoneNumber, {
-          'firstName': SessionStore.firstName,
-          'lastName': SessionStore.lastName,
-          'fullName': SessionStore.fullName,
-          'age': age.toString(),
-          'gender': gender,
-          'bloodGroup': bloodGroup,
-          'chronicConditions': chronicConditions ?? const <String>[],
-          'patientId': data['patientId'],
-        });
+        SessionStore.registerUser(SessionStore.phoneNumber, data);
       }
+      await _loadCurrentUserProfile(accessToken);
       return AuthResult.success(
         message: _readString(response.decoded, 'message') ??
             'Patient profile saved successfully',
@@ -375,6 +366,7 @@ class AuthService {
     final lastName = _readString(data, 'lastName');
     final phoneNumber = _readString(data, 'phoneNumber');
     final email = _readString(data, 'email');
+    final emergencyContact = _readString(data, 'emergencyContact');
 
     if (firstName != null && firstName.trim().isNotEmpty) {
       SessionStore.firstName = firstName.trim();
@@ -387,6 +379,40 @@ class AuthService {
     }
     if (email != null && email.trim().isNotEmpty) {
       SessionStore.email = email.trim();
+    }
+    if (emergencyContact != null && emergencyContact.trim().isNotEmpty) {
+      SessionStore.emergencyContact = emergencyContact.trim();
+    }
+
+    SessionStore.registerUser(SessionStore.phoneNumber, data);
+
+    final patient = data['patient'];
+    if (patient is Map<String, dynamic>) {
+      final age = _readString(patient, 'age');
+      final gender = _readString(patient, 'gender');
+      final bloodGroup = _readString(patient, 'bloodGroup');
+      final chronicConditions = patient['chronicConditions'];
+
+      if (age != null && age.trim().isNotEmpty) {
+        SessionStore.age = age.trim();
+      }
+      if (gender != null && gender.trim().isNotEmpty) {
+        SessionStore.gender = gender.trim();
+      }
+      if (bloodGroup != null && bloodGroup.trim().isNotEmpty) {
+        SessionStore.bloodGroup = bloodGroup.trim();
+      }
+      if (chronicConditions is List) {
+        SessionStore.chronicConditions = chronicConditions
+            .whereType<String>()
+            .map((item) => item.trim())
+            .where((item) => item.isNotEmpty)
+            .toList();
+      }
+      final patientId = _readString(patient, 'patientId');
+      if (patientId != null && patientId.trim().isNotEmpty) {
+        SessionStore.patientId = patientId.trim();
+      }
     }
   }
 
@@ -432,10 +458,13 @@ class AuthService {
 
   static String? _readString(Map<String, dynamic> decoded, String key) {
     final value = decoded[key];
+    if (value == null) {
+      return null;
+    }
     if (value is String) {
       return value;
     }
-    return null;
+    return value.toString();
   }
 
   static String _withDevOtp(String message) {
@@ -535,4 +564,3 @@ class LoginInitResult {
     return LoginInitResult._(success: false, message: message);
   }
 }
-

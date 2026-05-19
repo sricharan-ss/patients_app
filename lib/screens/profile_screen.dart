@@ -4,9 +4,14 @@ import 'my_information_screen.dart';
 import 'order_history_screen.dart';
 import 'secure_vault_screen.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final fullName = SessionStore.fullName;
@@ -100,24 +105,23 @@ class ProfileScreen extends StatelessWidget {
                       _buildSectionCard(
                         context,
                         title: 'My Information',
-                        preview: '28 years • O+',
+                        preview: '${SessionStore.ageLabel.isNotEmpty ? SessionStore.ageLabel + " years" : "Age not set"} • ${SessionStore.bloodGroupLabel.isNotEmpty ? SessionStore.bloodGroupLabel : "Blood Group not set"}',
                         icon: Icons.person_outline,
-                        onTap: () {
-                          Navigator.push(
+                        onTap: () async {
+                          await Navigator.push(
                             context,
                             MaterialPageRoute(builder: (_) => const MyInformationScreen()),
                           );
+                          if (mounted) setState(() {});
                         },
                         isInformation: true,
                         details: [
-                          {'label': 'Age', 'value': '28 years'},
-                          {'label': 'Gender', 'value': 'Male'},
+                          {'label': 'Age', 'value': SessionStore.ageLabel.isNotEmpty ? '${SessionStore.ageLabel} years' : 'Not set'},
+                          {'label': 'Gender', 'value': SessionStore.genderLabel.isNotEmpty ? SessionStore.genderLabel : 'Not set'},
                           {'label': 'Phone', 'value': phoneNumber},
                           {'label': 'Email', 'value': email},
                         ],
                       ),
-                      const SizedBox(height: 12),
-                      
                       // Order History
                       _buildSectionCard(
                         context,

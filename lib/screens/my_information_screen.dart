@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/session_store.dart';
 
+import '../services/auth_service.dart';
+
 class MyInformationScreen extends StatefulWidget {
   const MyInformationScreen({super.key});
 
@@ -11,21 +13,118 @@ class MyInformationScreen extends StatefulWidget {
 }
 
 class _MyInformationScreenState extends State<MyInformationScreen> {
-  final _nameController = TextEditingController(text: 'Sarah Johnson');
-  final _ageController = TextEditingController(text: '32');
-  final _phoneController = TextEditingController();
-  final _emailController = TextEditingController(text: 'sarah.johnson@email.com');
-  final _emergencyController = TextEditingController(text: '+1 234 567 8901');
+  late final TextEditingController _nameController;
+  late final TextEditingController _ageController;
+  late final TextEditingController _phoneController;
+  late final TextEditingController _emailController;
+  late final TextEditingController _emergencyController;
 
-  String _selectedGender = 'Female';
-  String? _selectedBloodGroup = 'O+';
+  late String _selectedGender;
+  late String? _selectedBloodGroup;
   final List<String> _bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
-  final Set<String> _conditions = {'Diabetes Type 2', 'Hypertension'};
+  late Set<String> _conditions;
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _phoneController.text = SessionStore.phoneNumber;
+    _nameController = TextEditingController(text: SessionStore.fullName);
+    _ageController = TextEditingController(text: SessionStore.ageLabel);
+    _phoneController = TextEditingController(text: SessionStore.phoneNumber);
+    _emailController = TextEditingController(text: SessionStore.email);
+    _emergencyController = TextEditingController(text: SessionStore.emergencyContact);
+
+    _selectedGender = _mapGenderFromApi(SessionStore.genderLabel);
+    _selectedBloodGroup = _mapBloodGroupFromApi(SessionStore.bloodGroupLabel);
+    if (!_bloodGroups.contains(_selectedBloodGroup)) {
+      _selectedBloodGroup = null;
+    }
+    _conditions = SessionStore.chronicConditionsLabel.toSet();
+  }
+
+  String _mapGenderFromApi(String apiValue) {
+    if (apiValue.isEmpty) return 'Female';
+    if (apiValue.toLowerCase() == 'male') return 'Male';
+    if (apiValue.toLowerCase() == 'female') return 'Female';
+    if (apiValue.toLowerCase() == 'other') return 'Other';
+    return apiValue;
+  }
+
+  String? _mapBloodGroupFromApi(String? apiValue) {
+    switch (apiValue) {
+      case 'A_POSITIVE': return 'A+';
+      case 'A_NEGATIVE': return 'A-';
+      case 'B_POSITIVE': return 'B+';
+      case 'B_NEGATIVE': return 'B-';
+      case 'AB_POSITIVE': return 'AB+';
+      case 'AB_NEGATIVE': return 'AB-';
+      case 'O_POSITIVE': return 'O+';
+      case 'O_NEGATIVE': return 'O-';
+      default: return apiValue;
+    }
+  }
+
+  String? _mapGenderToApi(String? genderLabel) {
+    switch ((genderLabel ?? '').toLowerCase()) {
+      case 'male': return 'male';
+      case 'female': return 'female';
+      case 'other': return 'other';
+      default: return null;
+    }
+  }
+
+  String? _mapBloodGroupToApi(String? bloodGroupLabel) {
+    switch (bloodGroupLabel) {
+      case 'A+': return 'A_POSITIVE';
+      case 'A-': return 'A_NEGATIVE';
+      case 'B+': return 'B_POSITIVE';
+      case 'B-': return 'B_NEGATIVE';
+      case 'AB+': return 'AB_POSITIVE';
+      case 'AB-': return 'AB_NEGATIVE';
+      case 'O+': return 'O_POSITIVE';
+      case 'O-': return 'O_NEGATIVE';
+      default: return null;
+    }
+  }
+
+  Future<void> _saveProfile() async {
+    final ageStr = _ageController.text.trim();
+    final age = int.tryParse(ageStr);
+    if (age == null) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter a valid age')));
+      return;
+    }
+
+    final gender = _mapGenderToApi(_selectedGender);
+    if (gender == null) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a valid gender')));
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    final result = await AuthService.upsertMyPatientProfile(
+      age: age,
+      gender: gender,
+      email: _emailController.text.trim(),
+      emergencyContact: _emergencyController.text.trim(),
+      bloodGroup: _mapBloodGroupToApi(_selectedBloodGroup),
+      chronicConditions: _conditions.toList(),
+    );
+
+    if (mounted) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result.message)));
+      if (result.success) {
+        SessionStore.email = _emailController.text.trim();
+        SessionStore.emergencyContact = _emergencyController.text.trim();
+        SessionStore.age = ageStr;
+        SessionStore.gender = gender;
+        if (_selectedBloodGroup != null) SessionStore.bloodGroup = _mapBloodGroupToApi(_selectedBloodGroup)!;
+        SessionStore.chronicConditions = _conditions.toList();
+        Navigator.pop(context);
+      }
+    }
   }
 
   @override
@@ -141,7 +240,8 @@ class _MyInformationScreenState extends State<MyInformationScreen> {
               const SizedBox(height: 12),
               const _FieldLabel('Chronic Conditions'),
               const SizedBox(height: 8),
-              Wrap(
+              if (_conditions.isNotEmpty)
+                Wrap(
                 spacing: 10,
                 runSpacing: 10,
                 children: _conditions
@@ -181,21 +281,27 @@ class _MyInformationScreenState extends State<MyInformationScreen> {
                 width: double.infinity,
                 height: 48,
                 child: ElevatedButton(
-                  onPressed: () {},
+                  onPressed: _isLoading ? null : _saveProfile,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.brownDeep,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text(
-                    'Save Changes',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                          height: 24,
+                          width: 24,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        )
+                      : const Text(
+                          'Save Changes',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                 ),
               ),
             ],
