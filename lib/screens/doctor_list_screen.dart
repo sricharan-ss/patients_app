@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
+import '../services/patient_api_service.dart';
 import 'doctor_profile_screen.dart';
 
 class DoctorListScreen extends StatefulWidget {
   final String? initialSearchQuery;
+  final String? hospitalId;
 
-  const DoctorListScreen({super.key, this.initialSearchQuery});
+  const DoctorListScreen({super.key, this.initialSearchQuery, this.hospitalId});
 
   @override
   State<DoctorListScreen> createState() => _DoctorListScreenState();
@@ -16,64 +18,9 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
   String _sortBy = 'rating'; // rating | reviews | patients
   Set<String> _selectedSpecialties = {};
   bool _showFilter = false;
-
-  static const _doctors = [
-    (
-      name: 'Dr. Emily Martinez',
-      specialty: 'Cardiologist',
-      hospital: 'City General Hospital',
-      rating: 4.8,
-      reviewCount: 245,
-      totalPatients: 1200,
-      experience: 12,
-      fee: 150,
-      aiPick: true,
-    ),
-    (
-      name: 'Dr. Sarah Chen',
-      specialty: 'General Physician',
-      hospital: 'Sunrise Medical',
-      rating: 4.7,
-      reviewCount: 312,
-      totalPatients: 1500,
-      experience: 8,
-      fee: 100,
-      aiPick: true,
-    ),
-    (
-      name: 'Dr. Michael Brown',
-      specialty: 'Orthopedist',
-      hospital: 'Metro Health Center',
-      rating: 4.6,
-      reviewCount: 201,
-      totalPatients: 980,
-      experience: 15,
-      fee: 175,
-      aiPick: false,
-    ),
-    (
-      name: 'Dr. Aisha Khan',
-      specialty: 'Dermatologist',
-      hospital: 'Wellness Clinic',
-      rating: 4.7,
-      reviewCount: 187,
-      totalPatients: 890,
-      experience: 6,
-      fee: 120,
-      aiPick: false,
-    ),
-    (
-      name: 'Dr. Rajesh Nair',
-      specialty: 'Neurologist',
-      hospital: 'City General Hospital',
-      rating: 4.5,
-      reviewCount: 166,
-      totalPatients: 760,
-      experience: 10,
-      fee: 200,
-      aiPick: false,
-    ),
-  ];
+  bool _isLoading = true;
+  String? _errorMessage;
+  List<PatientDoctor> _doctors = [];
 
   List<String> get _allSpecialties {
     final s = <String>{};
@@ -86,7 +33,10 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
   @override
   void initState() {
     super.initState();
-    _searchController = TextEditingController(text: widget.initialSearchQuery ?? '');
+    _searchController = TextEditingController(
+      text: widget.initialSearchQuery ?? '',
+    );
+    _loadDoctors();
   }
 
   @override
@@ -95,7 +45,30 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
     super.dispose();
   }
 
-  List<dynamic> get _filteredDoctors {
+  Future<void> _loadDoctors() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final doctors = await PatientApiService.getDoctors(
+        hospitalId: widget.hospitalId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _doctors = doctors;
+        _isLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = error.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  List<PatientDoctor> get _filteredDoctors {
     var result = _doctors.toList();
 
     // Search
@@ -104,13 +77,15 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
       result = result.where((d) {
         return d.name.toLowerCase().contains(q) ||
             d.specialty.toLowerCase().contains(q) ||
-            d.hospital.toLowerCase().contains(q);
+            d.hospitalName.toLowerCase().contains(q);
       }).toList();
     }
 
     // Specialty filter
     if (_selectedSpecialties.isNotEmpty) {
-      result = result.where((d) => _selectedSpecialties.contains(d.specialty)).toList();
+      result = result
+          .where((d) => _selectedSpecialties.contains(d.specialty))
+          .toList();
     }
 
     // Sort
@@ -181,7 +156,11 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
                             padding: const EdgeInsets.symmetric(horizontal: 12),
                             child: Row(
                               children: [
-                                const Icon(Icons.search, color: AppColors.brownMid, size: 18),
+                                const Icon(
+                                  Icons.search,
+                                  color: AppColors.brownMid,
+                                  size: 18,
+                                ),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: TextField(
@@ -193,7 +172,8 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
                                       fontWeight: FontWeight.w500,
                                     ),
                                     decoration: const InputDecoration(
-                                      hintText: 'Search doctors or specialties...',
+                                      hintText:
+                                          'Search doctors or specialties...',
                                       hintStyle: TextStyle(
                                         color: Color(0xFFB69A83),
                                         fontSize: 14,
@@ -296,7 +276,15 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
 
               // Doctor cards
               Expanded(
-                child: filtered.isEmpty
+                child: _isLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          color: AppColors.accent,
+                        ),
+                      )
+                    : _errorMessage != null
+                    ? _LoadError(message: _errorMessage!, onRetry: _loadDoctors)
+                    : filtered.isEmpty
                     ? Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -335,14 +323,17 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
                         itemBuilder: (context, i) {
                           final d = filtered[i];
                           return _DoctorCard(
+                            id: d.id,
                             name: d.name,
                             specialty: d.specialty,
-                            hospital: d.hospital,
+                            hospitalId: d.hospitalId,
+                            hospital: d.hospitalName,
+                            rating: d.rating,
                             reviewCount: d.reviewCount,
                             totalPatients: d.totalPatients,
                             experience: d.experience,
                             fee: d.fee,
-                            aiPick: d.aiPick,
+                            aiPick: i < 2,
                           );
                         },
                       ),
@@ -418,7 +409,11 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.close, color: AppColors.brownMid, size: 22),
+                          icon: const Icon(
+                            Icons.close,
+                            color: AppColors.brownMid,
+                            size: 22,
+                          ),
                           onPressed: () => setState(() => _showFilter = false),
                         ),
                       ],
@@ -438,18 +433,27 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
                           return GestureDetector(
                             onTap: () => _toggleSpecialty(s),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 10,
+                              ),
                               decoration: BoxDecoration(
-                                color: isSelected ? AppColors.accent : AppColors.cream,
+                                color: isSelected
+                                    ? AppColors.accent
+                                    : AppColors.cream,
                                 borderRadius: BorderRadius.circular(14),
                                 border: Border.all(
-                                  color: isSelected ? AppColors.accent : AppColors.surface,
+                                  color: isSelected
+                                      ? AppColors.accent
+                                      : AppColors.surface,
                                 ),
                               ),
                               child: Text(
                                 s,
                                 style: TextStyle(
-                                  color: isSelected ? Colors.white : AppColors.brownMid,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : AppColors.brownMid,
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -470,7 +474,8 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
                       children: [
                         Expanded(
                           child: GestureDetector(
-                            onTap: () => setState(() => _selectedSpecialties.clear()),
+                            onTap: () =>
+                                setState(() => _selectedSpecialties.clear()),
                             child: Container(
                               height: 48,
                               decoration: BoxDecoration(
@@ -529,9 +534,12 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
 
 class _DoctorCard extends StatelessWidget {
   const _DoctorCard({
+    required this.id,
     required this.name,
     required this.specialty,
+    required this.hospitalId,
     required this.hospital,
+    required this.rating,
     required this.reviewCount,
     required this.totalPatients,
     required this.experience,
@@ -539,9 +547,12 @@ class _DoctorCard extends StatelessWidget {
     required this.aiPick,
   });
 
+  final String id;
   final String name;
   final String specialty;
+  final String? hospitalId;
   final String hospital;
+  final double rating;
   final int reviewCount;
   final int totalPatients;
   final int experience;
@@ -557,7 +568,8 @@ class _DoctorCard extends StatelessWidget {
           context,
           MaterialPageRoute(
             builder: (_) => DoctorProfileScreen(
-              id: name.toLowerCase().replaceAll(' ', '-'),
+              id: id,
+              hospitalId: hospitalId,
               name: name,
               specialty: specialty,
               hospital: hospital,
@@ -580,182 +592,235 @@ class _DoctorCard extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                // Avatar
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: const BoxDecoration(
-                    color: AppColors.accent,
-                    shape: BoxShape.circle,
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    name.length > 3 ? name[3] : 'D',
-                    style: const TextStyle(
-                      color: AppColors.cream,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      fontFamily: 'Playfair Display',
+                  // Avatar
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: const BoxDecoration(
+                      color: AppColors.accent,
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      name.length > 3 ? name[3] : 'D',
+                      style: const TextStyle(
+                        color: AppColors.cream,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        fontFamily: 'Playfair Display',
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              name,
-                              style: const TextStyle(
-                                color: AppColors.brownDeep,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                fontFamily: 'Playfair Display',
-                              ),
-                            ),
-                          ),
-                          if (aiPick)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF1E7FF),
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    '✦ ',
-                                    style: TextStyle(
-                                      color: Color(0xFF8F3AF8),
-                                      fontSize: 9,
-                                    ),
-                                  ),
-                                  Text(
-                                    'AI Pick',
-                                    style: TextStyle(
-                                      color: Color(0xFF8F3AF8),
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        specialty,
-                        style: const TextStyle(
-                          color: AppColors.brownMid,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        hospital,
-                        style: const TextStyle(
-                          color: AppColors.brownLight,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 10,
-                        runSpacing: 4,
-                        children: [
-                          Text(
-                            '$reviewCount reviews',
-                            style: const TextStyle(
-                              color: AppColors.brownLight,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          Text(
-                            '$totalPatients+ patients',
-                            style: const TextStyle(
-                              color: AppColors.brownLight,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          Text(
-                            '${experience}y exp',
-                            style: const TextStyle(
-                              color: AppColors.brownLight,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-
-            // Fee + Book row
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.only(top: 10),
-              decoration: const BoxDecoration(
-                border: Border(top: BorderSide(color: AppColors.surface, width: 1)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  RichText(
-                    text: TextSpan(
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        TextSpan(
-                          text: '\$$fee ',
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                name,
+                                style: const TextStyle(
+                                  color: AppColors.brownDeep,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  fontFamily: 'Playfair Display',
+                                ),
+                              ),
+                            ),
+                            if (aiPick)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF1E7FF),
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      '✦ ',
+                                      style: TextStyle(
+                                        color: Color(0xFF8F3AF8),
+                                        fontSize: 9,
+                                      ),
+                                    ),
+                                    Text(
+                                      'AI Pick',
+                                      style: TextStyle(
+                                        color: Color(0xFF8F3AF8),
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          specialty,
                           style: const TextStyle(
-                            color: AppColors.brownDeep,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
+                            color: AppColors.brownMid,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
-                        const TextSpan(
-                          text: '/ visit',
-                          style: TextStyle(
+                        const SizedBox(height: 2),
+                        Text(
+                          hospital,
+                          style: const TextStyle(
                             color: AppColors.brownLight,
                             fontSize: 11,
-                            fontWeight: FontWeight.w400,
+                            fontWeight: FontWeight.w500,
                           ),
+                        ),
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 4,
+                          children: [
+                            Text(
+                              '${rating.toStringAsFixed(1)} rating',
+                              style: const TextStyle(
+                                color: AppColors.brownLight,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            Text(
+                              '$reviewCount reviews',
+                              style: const TextStyle(
+                                color: AppColors.brownLight,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            Text(
+                              '$totalPatients+ patients',
+                              style: const TextStyle(
+                                color: AppColors.brownLight,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            Text(
+                              '${experience}y exp',
+                              style: const TextStyle(
+                                color: AppColors.brownLight,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: AppColors.brownDeep,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Text(
-                      'Book Now',
-                      style: TextStyle(
-                        color: AppColors.cream,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
+                ],
+              ),
+
+              // Fee + Book row
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.only(top: 10),
+                decoration: const BoxDecoration(
+                  border: Border(
+                    top: BorderSide(color: AppColors.surface, width: 1),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    RichText(
+                      text: TextSpan(
+                        children: [
+                          TextSpan(
+                            text: '\$$fee ',
+                            style: const TextStyle(
+                              color: AppColors.brownDeep,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const TextSpan(
+                            text: '/ visit',
+                            style: TextStyle(
+                              color: AppColors.brownLight,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                ],
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.brownDeep,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Text(
+                        'Book Now',
+                        style: TextStyle(
+                          color: AppColors.cream,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LoadError extends StatelessWidget {
+  const _LoadError({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppColors.brownMid, fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: onRetry,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.brownDeep,
+              ),
+              child: const Text(
+                'Retry',
+                style: TextStyle(color: AppColors.warmWhite),
               ),
             ),
           ],
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 }

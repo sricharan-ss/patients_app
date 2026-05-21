@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
+import '../services/patient_api_service.dart';
 import 'hospital_detail_screen.dart';
 
 class HospitalListScreen extends StatefulWidget {
@@ -13,41 +14,40 @@ class HospitalListScreen extends StatefulWidget {
 
 class _HospitalListScreenState extends State<HospitalListScreen> {
   String _searchQuery = '';
-  
+
   // Filter states
   String? _appliedLocation;
   Set<String> _appliedSpecialties = {};
+  bool _isLoading = true;
+  String? _errorMessage;
+  List<PatientHospital> _hospitals = [];
 
-  static const _hospitals = [
-    (
-      name: 'City General Hospital',
-      location: 'New York',
-      distance: '2.3 km',
-      distanceNum: 2.3,
-      tags: ['Cardiology', 'Orthopedics', 'Neurology'],
-    ),
-    (
-      name: 'Metro Health Center',
-      location: 'New York',
-      distance: '3.1 km',
-      distanceNum: 3.1,
-      tags: ['Endocrinology', 'Pediatrics', 'Dermatology'],
-    ),
-    (
-      name: 'Sunrise Medical',
-      location: 'New York',
-      distance: '4.5 km',
-      distanceNum: 4.5,
-      tags: ['General Medicine', 'Surgery', 'Radiology'],
-    ),
-    (
-      name: 'Wellness Clinic',
-      location: 'New York',
-      distance: '5.2 km',
-      distanceNum: 5.2,
-      tags: ['Family Medicine', 'Psychiatry'],
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadHospitals();
+  }
+
+  Future<void> _loadHospitals() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final hospitals = await PatientApiService.getHospitals();
+      if (!mounted) return;
+      setState(() {
+        _hospitals = hospitals;
+        _isLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = error.toString();
+        _isLoading = false;
+      });
+    }
+  }
 
   List<String> get _allTags {
     final tags = <String>{};
@@ -60,23 +60,26 @@ class _HospitalListScreenState extends State<HospitalListScreen> {
   List<String> get _allLocations {
     final locs = <String>{};
     for (final h in _hospitals) {
-      locs.add(h.location);
+      locs.add(h.city);
     }
     return locs.toList()..sort();
   }
 
-  List<dynamic> get _filteredHospitals {
+  List<PatientHospital> get _filteredHospitals {
     var result = _hospitals.where((h) {
       // 1. Search Query
-      final matchesQuery = _searchQuery.isEmpty ||
+      final matchesQuery =
+          _searchQuery.isEmpty ||
           h.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          h.location.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          h.tags.any((t) => t.toLowerCase().contains(_searchQuery.toLowerCase()));
+          h.city.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          h.tags.any(
+            (t) => t.toLowerCase().contains(_searchQuery.toLowerCase()),
+          );
 
       // 2. Location
       bool matchesLocation = true;
       if (_appliedLocation != null) {
-        matchesLocation = h.location == _appliedLocation;
+        matchesLocation = h.city == _appliedLocation;
       }
 
       // 3. Specialties
@@ -84,13 +87,13 @@ class _HospitalListScreenState extends State<HospitalListScreen> {
       if (_appliedSpecialties.isNotEmpty) {
         matchesSpecialty = h.tags.any((t) => _appliedSpecialties.contains(t));
       }
-      
+
       return matchesQuery && matchesLocation && matchesSpecialty;
     }).toList();
 
     // Sort by distance if nearby mode
     if (widget.nearbyOnly) {
-      result.sort((a, b) => a.distanceNum.compareTo(b.distanceNum));
+      result.sort((a, b) => a.city.compareTo(b.city));
     }
 
     return result;
@@ -109,14 +112,18 @@ class _HospitalListScreenState extends State<HospitalListScreen> {
       ),
       builder: (context) => StatefulBuilder(
         builder: (context, setModalState) {
-          
           Widget buildChip(String title, bool isSelected, VoidCallback onTap) {
             return GestureDetector(
               onTap: onTap,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
-                  color: isSelected ? AppColors.accent : const Color(0xFFFBF6EC),
+                  color: isSelected
+                      ? AppColors.accent
+                      : const Color(0xFFFBF6EC),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
                     color: isSelected ? AppColors.accent : AppColors.surface,
@@ -166,7 +173,10 @@ class _HospitalListScreenState extends State<HospitalListScreen> {
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.close, color: AppColors.brownDeep),
+                          icon: const Icon(
+                            Icons.close,
+                            color: AppColors.brownDeep,
+                          ),
                           onPressed: () => Navigator.pop(context),
                         ),
                       ],
@@ -189,7 +199,11 @@ class _HospitalListScreenState extends State<HospitalListScreen> {
                               return buildChip(
                                 loc,
                                 tempLocation == loc,
-                                () => setModalState(() => tempLocation = tempLocation == loc ? null : loc),
+                                () => setModalState(
+                                  () => tempLocation = tempLocation == loc
+                                      ? null
+                                      : loc,
+                                ),
                               );
                             }).toList(),
                           ),
@@ -202,19 +216,15 @@ class _HospitalListScreenState extends State<HospitalListScreen> {
                             runSpacing: 8,
                             children: _allTags.map((tag) {
                               final isSelected = tempSpecialties.contains(tag);
-                              return buildChip(
-                                tag,
-                                isSelected,
-                                () {
-                                  setModalState(() {
-                                    if (isSelected) {
-                                      tempSpecialties.remove(tag);
-                                    } else {
-                                      tempSpecialties.add(tag);
-                                    }
-                                  });
-                                },
-                              );
+                              return buildChip(tag, isSelected, () {
+                                setModalState(() {
+                                  if (isSelected) {
+                                    tempSpecialties.remove(tag);
+                                  } else {
+                                    tempSpecialties.add(tag);
+                                  }
+                                });
+                              });
                             }).toList(),
                           ),
                         ],
@@ -296,7 +306,8 @@ class _HospitalListScreenState extends State<HospitalListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isFilterActive = _appliedLocation != null || _appliedSpecialties.isNotEmpty;
+    final isFilterActive =
+        _appliedLocation != null || _appliedSpecialties.isNotEmpty;
 
     return Scaffold(
       backgroundColor: AppColors.warmWhite,
@@ -355,11 +366,15 @@ class _HospitalListScreenState extends State<HospitalListScreen> {
                         color: AppColors.cream,
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(color: AppColors.surface),
-                    ),
+                      ),
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       child: Row(
                         children: [
-                          const Icon(Icons.search, color: AppColors.brownMid, size: 20),
+                          const Icon(
+                            Icons.search,
+                            color: AppColors.brownMid,
+                            size: 20,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: TextField(
@@ -400,13 +415,17 @@ class _HospitalListScreenState extends State<HospitalListScreen> {
                         color: AppColors.cream,
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: isFilterActive ? AppColors.accent : AppColors.surface,
+                          color: isFilterActive
+                              ? AppColors.accent
+                              : AppColors.surface,
                         ),
                       ),
                       child: Icon(
-                        Icons.filter_alt_outlined, 
-                        color: isFilterActive ? AppColors.accent : AppColors.brownMid, 
-                        size: 20
+                        Icons.filter_alt_outlined,
+                        color: isFilterActive
+                            ? AppColors.accent
+                            : AppColors.brownMid,
+                        size: 20,
                       ),
                     ),
                   ),
@@ -414,7 +433,13 @@ class _HospitalListScreenState extends State<HospitalListScreen> {
               ),
             ),
             Expanded(
-              child: _filteredHospitals.isEmpty
+              child: _isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(color: AppColors.accent),
+                    )
+                  : _errorMessage != null
+                  ? _LoadError(message: _errorMessage!, onRetry: _loadHospitals)
+                  : _filteredHospitals.isEmpty
                   ? const Center(
                       child: Text(
                         'No hospitals found',
@@ -435,19 +460,59 @@ class _HospitalListScreenState extends State<HospitalListScreen> {
                           onTap: () => Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => HospitalDetailScreen(hospitalName: h.name),
+                              builder: (_) => HospitalDetailScreen(
+                                hospitalName: h.name,
+                                hospitalId: h.id,
+                              ),
                             ),
                           ),
                           child: _HospitalRowCard(
                             name: h.name,
-                            location: h.location,
-                            distance: h.distance,
+                            location: h.city,
+                            distance: '${h.doctorCount} doctors',
                             tags: h.tags,
                             isNearby: widget.nearbyOnly,
                           ),
                         );
                       },
                     ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LoadError extends StatelessWidget {
+  const _LoadError({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppColors.brownMid, fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: onRetry,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.brownDeep,
+              ),
+              child: const Text(
+                'Retry',
+                style: TextStyle(color: AppColors.warmWhite),
+              ),
             ),
           ],
         ),
@@ -515,12 +580,18 @@ class _HospitalRowCard extends StatelessWidget {
           const SizedBox(height: 4),
           Row(
             children: [
-              const Icon(Icons.location_on_outlined, color: Color(0xFF6B3A1F), size: 12),
+              const Icon(
+                Icons.location_on_outlined,
+                color: Color(0xFF6B3A1F),
+                size: 12,
+              ),
               const SizedBox(width: 4),
               Text(
                 '$location · $distance',
                 style: TextStyle(
-                  color: isNearby ? const Color(0xFF2E7D32) : const Color(0xFF6B3A1F),
+                  color: isNearby
+                      ? const Color(0xFF2E7D32)
+                      : const Color(0xFF6B3A1F),
                   fontSize: 14,
                   fontWeight: isNearby ? FontWeight.w600 : FontWeight.w500,
                 ),
@@ -528,7 +599,10 @@ class _HospitalRowCard extends StatelessWidget {
               if (isNearby) ...[
                 const SizedBox(width: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFE8F5E9),
                     borderRadius: BorderRadius.circular(8),
@@ -552,7 +626,10 @@ class _HospitalRowCard extends StatelessWidget {
             children: tags
                 .map(
                   (tag) => Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFE9DCCA),
                       borderRadius: BorderRadius.circular(18),

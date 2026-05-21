@@ -37,7 +37,8 @@ class AuthService {
       if (verificationToken != null && verificationToken.isNotEmpty) {
         SessionStore.verificationToken = verificationToken;
         SessionStore.devOtp = _readString(response.decoded, 'devOtp');
-        final backendMessage = _readString(response.decoded, 'message') ??
+        final backendMessage =
+            _readString(response.decoded, 'message') ??
             'OTP sent to your phone.';
         return SignupInitResult.success(
           message: _withDevOtp(backendMessage),
@@ -60,9 +61,7 @@ class AuthService {
 
     final response = await _postWithFallback(
       paths: const ['/api/auth/login/phone', '/api/auth/user'],
-      payload: {
-        'phoneNumber': phoneNumber,
-      },
+      payload: {'phoneNumber': phoneNumber},
     );
 
     if (response.networkError != null) {
@@ -76,7 +75,8 @@ class AuthService {
         SessionStore.devOtp = _readString(response.decoded, 'devOtp');
         return LoginInitResult.success(
           message: _withDevOtp(
-            _readString(response.decoded, 'message') ?? 'OTP sent to your phone.',
+            _readString(response.decoded, 'message') ??
+                'OTP sent to your phone.',
           ),
           verificationToken: verificationToken,
         );
@@ -89,9 +89,7 @@ class AuthService {
     );
   }
 
-  static Future<AuthResult> verifyOtp({
-    required String otp,
-  }) async {
+  static Future<AuthResult> verifyOtp({required String otp}) async {
     final token = SessionStore.verificationToken;
     if (token == null || token.isEmpty) {
       return AuthResult.failure('No verification token. Please try again.');
@@ -103,10 +101,7 @@ class AuthService {
             '/api/auth/verify-otp-temp',
             '/api/auth/login/phone/verify',
           ]
-        : const [
-            '/api/auth/login/phone/verify',
-            '/api/auth/verify-otp',
-          ];
+        : const ['/api/auth/login/phone/verify', '/api/auth/verify-otp'];
 
     final response = await _postWithFallback(
       paths: candidatePaths,
@@ -126,7 +121,9 @@ class AuthService {
         await _loadCurrentUserProfile(accessToken);
         SessionStore.verificationToken = null;
         return AuthResult.success(
-          message: _readString(response.decoded, 'message') ?? 'Authentication successful',
+          message:
+              _readString(response.decoded, 'message') ??
+              'Authentication successful',
         );
       }
       return AuthResult.failure('No access token received');
@@ -147,9 +144,7 @@ class AuthService {
       );
     }
 
-    return AuthResult.failure(
-      message,
-    );
+    return AuthResult.failure(message);
   }
 
   static Future<AuthResult> resendOtp() async {
@@ -158,7 +153,9 @@ class AuthService {
     }
 
     if (SessionStore.currentAuthFlow == AuthFlow.login) {
-      final loginResult = await loginInitiate(phoneNumber: SessionStore.phoneNumber);
+      final loginResult = await loginInitiate(
+        phoneNumber: SessionStore.phoneNumber,
+      );
       if (loginResult.success) {
         return AuthResult.success(message: loginResult.message);
       }
@@ -168,7 +165,9 @@ class AuthService {
     final firstName = SessionStore.firstName.trim();
     final lastName = SessionStore.lastName.trim();
     if (firstName.isEmpty || lastName.isEmpty) {
-      return AuthResult.failure('Name details are missing. Please restart signup.');
+      return AuthResult.failure(
+        'Name details are missing. Please restart signup.',
+      );
     }
 
     final signupResult = await signupInitiate(
@@ -195,18 +194,12 @@ class AuthService {
       return AuthResult.failure('Not authenticated. Please login again.');
     }
 
-    final response = await _put(
-      '/api/patients/me/profile',
-      {
-        'age': age,
-        'gender': gender,
-        if (email != null && email.isNotEmpty) 'email': email,
-        if (emergencyContact != null && emergencyContact.isNotEmpty) 'emergencyContact': emergencyContact,
-        if (bloodGroup != null && bloodGroup.isNotEmpty) 'bloodGroup': bloodGroup,
-        if (chronicConditions != null) 'chronicConditions': chronicConditions,
-      },
-      bearerToken: accessToken,
-    );
+    final response = await _put('/api/patients/me/profile', {
+      'age': age,
+      'gender': gender,
+      if (bloodGroup != null && bloodGroup.isNotEmpty) 'bloodGroup': bloodGroup,
+      if (chronicConditions != null) 'chronicConditions': chronicConditions,
+    }, bearerToken: accessToken);
 
     if (response.networkError != null) {
       return AuthResult.failure(response.networkError!);
@@ -219,7 +212,8 @@ class AuthService {
       }
       await _loadCurrentUserProfile(accessToken);
       return AuthResult.success(
-        message: _readString(response.decoded, 'message') ??
+        message:
+            _readString(response.decoded, 'message') ??
             'Patient profile saved successfully',
       );
     }
@@ -239,7 +233,9 @@ class AuthService {
     for (var index = 0; index < paths.length; index++) {
       final path = paths[index];
       final response = await _post(path, payload, bearerToken: bearerToken);
-      if (!retryOnNotFound || response.statusCode != 404 || index == paths.length - 1) {
+      if (!retryOnNotFound ||
+          response.statusCode != 404 ||
+          index == paths.length - 1) {
         return response;
       }
     }
@@ -257,9 +253,7 @@ class AuthService {
     String? bearerToken,
   }) async {
     try {
-      final headers = {
-        'Content-Type': 'application/json',
-      };
+      final headers = {'Content-Type': 'application/json'};
       if (bearerToken != null && bearerToken.isNotEmpty) {
         headers['Authorization'] = 'Bearer $bearerToken';
       }
@@ -277,7 +271,8 @@ class AuthService {
       );
     } catch (e) {
       final errorStr = e.toString().toLowerCase();
-      final isNetworkError = errorStr.contains('socketexception') ||
+      final isNetworkError =
+          errorStr.contains('socketexception') ||
           errorStr.contains('failed host lookup') ||
           errorStr.contains('clientexception') ||
           errorStr.contains('connection refused') ||
@@ -305,9 +300,7 @@ class AuthService {
     String? bearerToken,
   }) async {
     try {
-      final headers = {
-        'Content-Type': 'application/json',
-      };
+      final headers = {'Content-Type': 'application/json'};
       if (bearerToken != null && bearerToken.isNotEmpty) {
         headers['Authorization'] = 'Bearer $bearerToken';
       }
@@ -325,7 +318,8 @@ class AuthService {
       );
     } catch (e) {
       final errorStr = e.toString().toLowerCase();
-      final isNetworkError = errorStr.contains('socketexception') ||
+      final isNetworkError =
+          errorStr.contains('socketexception') ||
           errorStr.contains('failed host lookup') ||
           errorStr.contains('clientexception') ||
           errorStr.contains('connection refused') ||
@@ -348,10 +342,7 @@ class AuthService {
   }
 
   static Future<void> _loadCurrentUserProfile(String accessToken) async {
-    final response = await _get(
-      '/api/users/myinfo',
-      bearerToken: accessToken,
-    );
+    final response = await _get('/api/users/myinfo', bearerToken: accessToken);
 
     if (response.statusCode != 200) {
       return;
@@ -392,9 +383,21 @@ class AuthService {
       final gender = _readString(patient, 'gender');
       final bloodGroup = _readString(patient, 'bloodGroup');
       final chronicConditions = patient['chronicConditions'];
+      final dob = _readString(patient, 'dob');
 
       if (age != null && age.trim().isNotEmpty) {
         SessionStore.age = age.trim();
+      } else if (dob != null && dob.trim().isNotEmpty) {
+        final parsedDob = DateTime.tryParse(dob);
+        if (parsedDob != null) {
+          final now = DateTime.now();
+          var calculatedAge = now.year - parsedDob.year;
+          if (now.month < parsedDob.month ||
+              (now.month == parsedDob.month && now.day < parsedDob.day)) {
+            calculatedAge--;
+          }
+          SessionStore.age = calculatedAge.toString();
+        }
       }
       if (gender != null && gender.trim().isNotEmpty) {
         SessionStore.gender = gender.trim();
@@ -426,10 +429,7 @@ class AuthService {
         headers['Authorization'] = 'Bearer $bearerToken';
       }
 
-      final response = await http.get(
-        _uri(path),
-        headers: headers,
-      );
+      final response = await http.get(_uri(path), headers: headers);
 
       final decoded = _decodeMap(response.body);
       return _BackendResponse(

@@ -120,9 +120,10 @@ const _hospitals = [
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 class HospitalDetailScreen extends StatelessWidget {
-  const HospitalDetailScreen({super.key, required this.hospitalName});
+  const HospitalDetailScreen({super.key, required this.hospitalName, this.hospitalId});
 
   final String hospitalName;
+  final String? hospitalId;
 
   static _HospitalData _findHospital(String name) {
     return _hospitals.firstWhere(

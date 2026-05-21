@@ -17,9 +17,7 @@ import 'screens/search_results_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-  ]);
+  SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   runApp(const VitaDataApp());
 }
 
@@ -37,7 +35,9 @@ class VitaDataApp extends StatelessWidget {
         final currentScale = mediaQuery.textScaler.scale(1.0);
         final clampedScale = currentScale.clamp(0.9, 1.0).toDouble();
         return MediaQuery(
-          data: mediaQuery.copyWith(textScaler: TextScaler.linear(clampedScale)),
+          data: mediaQuery.copyWith(
+            textScaler: TextScaler.linear(clampedScale),
+          ),
           child: child ?? const SizedBox.shrink(),
         );
       },
@@ -49,11 +49,17 @@ class VitaDataApp extends StatelessWidget {
           case '/phone-input':
             return MaterialPageRoute(builder: (_) => const PhoneInputScreen());
           case '/login-phone-input':
-            return MaterialPageRoute(builder: (_) => const LoginPhoneInputScreen());
+            return MaterialPageRoute(
+              builder: (_) => const LoginPhoneInputScreen(),
+            );
           case '/otp-verification':
-            return MaterialPageRoute(builder: (_) => const OTPVerificationScreen());
+            return MaterialPageRoute(
+              builder: (_) => const OTPVerificationScreen(),
+            );
           case '/profile-setup':
-            return MaterialPageRoute(builder: (_) => const ProfileSetupScreen());
+            return MaterialPageRoute(
+              builder: (_) => const ProfileSetupScreen(),
+            );
           case '/main-app':
             return MaterialPageRoute(builder: (_) => const MainAppScreen());
           case '/settings':
@@ -71,11 +77,17 @@ class VitaDataApp extends StatelessWidget {
           case '/doctor-list':
             final args = settings.arguments as Map<String, dynamic>?;
             final searchQuery = args?['searchQuery'] as String?;
+            final hospitalId = args?['hospitalId'] as String?;
             return MaterialPageRoute(
-              builder: (_) => DoctorListScreen(initialSearchQuery: searchQuery),
+              builder: (_) => DoctorListScreen(
+                initialSearchQuery: searchQuery,
+                hospitalId: hospitalId,
+              ),
             );
           case '/search-results':
-            return MaterialPageRoute(builder: (_) => const SearchResultsScreen());
+            return MaterialPageRoute(
+              builder: (_) => const SearchResultsScreen(),
+            );
           default:
             return MaterialPageRoute(builder: (_) => const LandingPage());
         }
@@ -83,4 +95,3 @@ class VitaDataApp extends StatelessWidget {
     );
   }
 }
-

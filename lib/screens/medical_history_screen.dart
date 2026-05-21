@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/app_colors.dart';
+import '../services/patient_api_service.dart';
 
 class MedicalHistoryScreen extends StatelessWidget {
   const MedicalHistoryScreen({super.key});
@@ -28,8 +29,13 @@ class MedicalHistoryScreen extends StatelessWidget {
                     ),
                     const Spacer(),
                     IconButton(
-                      onPressed: () => Navigator.pushNamed(context, '/settings'),
-                      icon: const Icon(Icons.settings_outlined, color: AppColors.brownDeep, size: 22),
+                      onPressed: () =>
+                          Navigator.pushNamed(context, '/settings'),
+                      icon: const Icon(
+                        Icons.settings_outlined,
+                        color: AppColors.brownDeep,
+                        size: 22,
+                      ),
                     ),
                   ],
                 ),
@@ -42,7 +48,9 @@ class MedicalHistoryScreen extends StatelessWidget {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const PrescriptionsScreen()),
+                    MaterialPageRoute(
+                      builder: (_) => const PrescriptionsScreen(),
+                    ),
                   );
                 },
               ),
@@ -66,7 +74,9 @@ class MedicalHistoryScreen extends StatelessWidget {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const AppointmentHistoryScreen()),
+                    MaterialPageRoute(
+                      builder: (_) => const AppointmentHistoryScreen(),
+                    ),
                   );
                 },
               ),
@@ -83,29 +93,31 @@ class PrescriptionsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const _HistoryRecordsPage(
+    return _HistoryRecordsPage(
       title: 'Prescriptions',
       searchHint: 'Search prescriptions...',
-      records: [
-        _HistoryRecord(
-          primary: 'Dr. Emily Martinez',
-          secondary: 'Cardiologist',
-          source: 'City General Hospital',
-          date: 'March 15, 2026',
-        ),
-        _HistoryRecord(
-          primary: 'Dr. James Wilson',
-          secondary: 'Endocrinologist',
-          source: 'Metro Health Center',
-          date: 'February 28, 2026',
-        ),
-        _HistoryRecord(
-          primary: 'Dr. Sarah Chen',
-          secondary: 'General Physician',
-          source: 'Sunrise Medical',
-          date: 'February 10, 2026',
-        ),
-      ],
+      loader: () async {
+        final records = await PatientApiService.getRecords();
+        return records.prescriptions.map((item) {
+          final encounter = item['encounter'];
+          final doctor = encounter is Map<String, dynamic>
+              ? encounter['doctor']
+              : null;
+          final hospital = encounter is Map<String, dynamic>
+              ? encounter['hospital']
+              : null;
+          return _HistoryRecord(
+            primary: _nestedString(doctor, 'name', 'Prescription'),
+            secondary:
+                '${(item['medicines'] as List?)?.length ?? 0} medicine(s)',
+            source: _nestedString(hospital, 'name', 'VITADATA'),
+            date: _formatDate(
+              item['generatedAt'] ??
+                  (encounter is Map ? encounter['scheduledTime'] : null),
+            ),
+          );
+        }).toList();
+      },
     );
   }
 }
@@ -115,29 +127,27 @@ class LabReportsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const _HistoryRecordsPage(
+    return _HistoryRecordsPage(
       title: 'Lab Reports',
       searchHint: 'Search lab reports...',
-      records: [
-        _HistoryRecord(
-          primary: 'Complete Blood Count',
-          secondary: 'Normal',
-          source: 'City Lab Diagnostics',
-          date: 'March 16, 2026',
-        ),
-        _HistoryRecord(
-          primary: 'Thyroid Profile',
-          secondary: 'Pending Review',
-          source: 'Metro Path Lab',
-          date: 'March 02, 2026',
-        ),
-        _HistoryRecord(
-          primary: 'Lipid Profile',
-          secondary: 'Borderline High',
-          source: 'Wellness Lab Center',
-          date: 'February 11, 2026',
-        ),
-      ],
+      loader: () async {
+        final records = await PatientApiService.getRecords();
+        return records.labReports.map((item) {
+          final encounter = item['encounter'];
+          final hospital = encounter is Map<String, dynamic>
+              ? encounter['hospital']
+              : null;
+          return _HistoryRecord(
+            primary: item['testName']?.toString() ?? 'Lab report',
+            secondary:
+                item['remarks']?.toString() ??
+                item['resultValue']?.toString() ??
+                'Uploaded',
+            source: _nestedString(hospital, 'name', 'VITADATA Lab'),
+            date: _formatDate(item['reportedAt']),
+          );
+        }).toList();
+      },
     );
   }
 }
@@ -147,29 +157,20 @@ class AppointmentHistoryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const _HistoryRecordsPage(
+    return _HistoryRecordsPage(
       title: 'Appointment History',
       searchHint: 'Search appointments...',
-      records: [
-        _HistoryRecord(
-          primary: 'Dr. Emily Martinez',
-          secondary: 'Cardiologist',
-          source: 'City General Hospital',
-          date: 'March 15, 2026',
-        ),
-        _HistoryRecord(
-          primary: 'Dr. James Wilson',
-          secondary: 'Endocrinologist',
-          source: 'Metro Health Center',
-          date: 'February 28, 2026',
-        ),
-        _HistoryRecord(
-          primary: 'Dr. Sarah Chen',
-          secondary: 'General Physician',
-          source: 'Sunrise Medical',
-          date: 'February 10, 2026',
-        ),
-      ],
+      loader: () async {
+        final records = await PatientApiService.getRecords();
+        return records.appointments.map((appointment) {
+          return _HistoryRecord(
+            primary: appointment.doctor?.name ?? 'Doctor appointment',
+            secondary: '${appointment.status} • Token ${appointment.tokenNo}',
+            source: appointment.hospital?.name ?? 'VITADATA Hospital',
+            date: _formatDate(appointment.scheduledTime),
+          );
+        }).toList();
+      },
     );
   }
 }
@@ -178,12 +179,12 @@ class _HistoryRecordsPage extends StatefulWidget {
   const _HistoryRecordsPage({
     required this.title,
     required this.searchHint,
-    required this.records,
+    required this.loader,
   });
 
   final String title;
   final String searchHint;
-  final List<_HistoryRecord> records;
+  final Future<List<_HistoryRecord>> Function() loader;
 
   @override
   State<_HistoryRecordsPage> createState() => _HistoryRecordsPageState();
@@ -191,15 +192,16 @@ class _HistoryRecordsPage extends StatefulWidget {
 
 class _HistoryRecordsPageState extends State<_HistoryRecordsPage> {
   String _query = '';
+  late Future<List<_HistoryRecord>> _recordsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _recordsFuture = widget.loader();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final normalized = _query.trim().toLowerCase();
-    final filtered = widget.records.where((record) {
-      final text = '${record.primary} ${record.secondary} ${record.source}'.toLowerCase();
-      return text.contains(normalized);
-    }).toList();
-
     return Scaffold(
       backgroundColor: AppColors.warmWhite,
       appBar: AppBar(
@@ -234,29 +236,73 @@ class _HistoryRecordsPageState extends State<_HistoryRecordsPage> {
               decoration: InputDecoration(
                 hintText: widget.searchHint,
                 hintStyle: const TextStyle(color: AppColors.brownLight),
-                prefixIcon: const Icon(Icons.search, color: AppColors.brownLight, size: 20),
+                prefixIcon: const Icon(
+                  Icons.search,
+                  color: AppColors.brownLight,
+                  size: 20,
+                ),
                 filled: true,
                 fillColor: AppColors.warmWhite,
-                contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 8),
+                contentPadding: const EdgeInsets.symmetric(
+                  vertical: 0,
+                  horizontal: 8,
+                ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(24),
                   borderSide: const BorderSide(color: AppColors.brownLight),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(24),
-                  borderSide: const BorderSide(color: AppColors.accent, width: 1.4),
+                  borderSide: const BorderSide(
+                    color: AppColors.accent,
+                    width: 1.4,
+                  ),
                 ),
               ),
             ),
             const SizedBox(height: 12),
             Expanded(
-              child: ListView.separated(
-                padding: EdgeInsets.zero,
-                itemCount: filtered.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (context, index) {
-                  final record = filtered[index];
-                  return _HistoryRecordCard(record: record);
+              child: FutureBuilder<List<_HistoryRecord>>(
+                future: _recordsFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState != ConnectionState.done) {
+                    return const Center(
+                      child: CircularProgressIndicator(color: AppColors.accent),
+                    );
+                  }
+                  if (snapshot.hasError) {
+                    return _HistoryMessage(
+                      message: snapshot.error.toString(),
+                      onRetry: () =>
+                          setState(() => _recordsFuture = widget.loader()),
+                    );
+                  }
+
+                  final normalized = _query.trim().toLowerCase();
+                  final filtered = (snapshot.data ?? const <_HistoryRecord>[])
+                      .where((record) {
+                        final text =
+                            '${record.primary} ${record.secondary} ${record.source}'
+                                .toLowerCase();
+                        return text.contains(normalized);
+                      })
+                      .toList();
+
+                  if (filtered.isEmpty) {
+                    return const _HistoryMessage(
+                      message: 'No records found yet.',
+                    );
+                  }
+
+                  return ListView.separated(
+                    padding: EdgeInsets.zero,
+                    itemCount: filtered.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    itemBuilder: (context, index) {
+                      final record = filtered[index];
+                      return _HistoryRecordCard(record: record);
+                    },
+                  );
                 },
               ),
             ),
@@ -265,6 +311,75 @@ class _HistoryRecordsPageState extends State<_HistoryRecordsPage> {
       ),
     );
   }
+}
+
+class _HistoryMessage extends StatelessWidget {
+  const _HistoryMessage({required this.message, this.onRetry});
+
+  final String message;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppColors.brownMid, fontSize: 13),
+            ),
+            if (onRetry != null) ...[
+              const SizedBox(height: 12),
+              ElevatedButton(
+                onPressed: onRetry,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.brownDeep,
+                ),
+                child: const Text(
+                  'Retry',
+                  style: TextStyle(color: AppColors.warmWhite),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _nestedString(dynamic value, String key, String fallback) {
+  if (value is Map<String, dynamic>) {
+    final result = value[key]?.toString().trim();
+    if (result != null && result.isNotEmpty) return result;
+  }
+  return fallback;
+}
+
+String _formatDate(dynamic value) {
+  final date = value is DateTime
+      ? value
+      : DateTime.tryParse(value?.toString() ?? '');
+  if (date == null) return 'Date not available';
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  return '${months[date.month - 1]} ${date.day}, ${date.year}';
 }
 
 class _HistoryCategoryCard extends StatelessWidget {
@@ -376,7 +491,11 @@ class _HistoryRecordCard extends StatelessWidget {
               const SizedBox(width: 10),
               IconButton(
                 onPressed: () {},
-                icon: const Icon(Icons.file_download_outlined, color: AppColors.accent, size: 20),
+                icon: const Icon(
+                  Icons.file_download_outlined,
+                  color: AppColors.accent,
+                  size: 20,
+                ),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
                 splashRadius: 20,
@@ -386,20 +505,14 @@ class _HistoryRecordCard extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             record.secondary,
-            style: const TextStyle(
-              color: AppColors.brownMid,
-              fontSize: 13,
-            ),
+            style: const TextStyle(color: AppColors.brownMid, fontSize: 13),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 2),
           Text(
             record.source,
-            style: const TextStyle(
-              color: AppColors.brownLight,
-              fontSize: 12,
-            ),
+            style: const TextStyle(color: AppColors.brownLight, fontSize: 12),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
