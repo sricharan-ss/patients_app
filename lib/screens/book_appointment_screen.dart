@@ -201,7 +201,11 @@ class _BookAppointmentScreenState extends State<BookAppointmentScreen> {
       });
       Future.delayed(const Duration(milliseconds: 2500), () {
         if (mounted) {
-          Navigator.of(context).popUntil((route) => route.isFirst);
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            '/main-app',
+            (route) => false,
+          );
         }
       });
     } catch (error) {
@@ -1077,9 +1081,11 @@ class _BookAppointmentScreenState extends State<BookAppointmentScreen> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: () => Navigator.of(
+                          onPressed: () => Navigator.pushNamedAndRemoveUntil(
                             context,
-                          ).popUntil((route) => route.isFirst),
+                            '/main-app',
+                            (route) => false,
+                          ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF3B1F0A),
                             padding: const EdgeInsets.symmetric(vertical: 16),

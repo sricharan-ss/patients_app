@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import '../core/app_colors.dart';
 import '../core/session_store.dart';
+import '../services/patient_api_service.dart';
 import '../screens/hospital_detail_screen.dart';
 import 'profile_screen.dart';
 import 'medications_screen.dart';
@@ -125,11 +126,11 @@ class _MainAppScreenState extends State<MainAppScreen> {
       backgroundColor: AppColors.warmWhite,
       body: IndexedStack(
         index: _selectedIndex,
-        children: const [
-          _HomeTab(),
-          MedicationsScreen(),
-          MedicalHistoryScreen(),
-          ProfileScreen(),
+        children: [
+          const _HomeTab(),
+          const MedicationsScreen(),
+          const MedicalHistoryScreen(),
+          const ProfileScreen(),
         ],
       ),
       bottomNavigationBar: _BottomNav(
@@ -143,98 +144,189 @@ class _MainAppScreenState extends State<MainAppScreen> {
 // ─────────────────────────────────────────────────────────────
 // Home Tab
 // ─────────────────────────────────────────────────────────────
-class _HomeTab extends StatelessWidget {
+class _HomeTab extends StatefulWidget {
   const _HomeTab();
 
   @override
+  State<_HomeTab> createState() => _HomeTabState();
+}
+
+class _HomeTabState extends State<_HomeTab> {
+  bool _isLoading = true;
+  String? _errorMessage;
+  List<PatientAppointment> _appointments = <PatientAppointment>[];
+  List<PatientHospital> _hospitals = <PatientHospital>[];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHomeData();
+  }
+
+  Future<void> _loadHomeData() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final results = await Future.wait<dynamic>([
+        PatientApiService.getAppointments(),
+        PatientApiService.getHospitals(),
+      ]);
+
+      if (!mounted) return;
+      setState(() {
+        _appointments = results[0] as List<PatientAppointment>;
+        _hospitals = results[1] as List<PatientHospital>;
+        _isLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = error.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  Color _statusColor(String status) {
+    final normalized = status.trim().toUpperCase();
+    if (normalized == 'COMPLETED') return const Color(0xFF2E7D32);
+    if (normalized == 'CANCELLED' || normalized == 'NO_SHOW') {
+      return AppColors.errorRed;
+    }
+    return AppColors.accent;
+  }
+
+  String _formatDate(DateTime? dateTime) {
+    if (dateTime == null) return 'Date TBD';
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${months[dateTime.month - 1]} ${dateTime.day}';
+  }
+
+  String _formatTime(DateTime? dateTime) {
+    if (dateTime == null) return 'Time TBD';
+    final hour = dateTime.hour;
+    final minute = dateTime.minute;
+    final displayHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+    final meridiem = hour >= 12 ? 'PM' : 'AM';
+    return '$displayHour:${minute.toString().padLeft(2, '0')} $meridiem';
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _HomeHeader(),
-          const SizedBox(height: 24),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _SectionHeader(title: 'Your Appointments', onSeeAll: null),
-                const SizedBox(height: 12),
-                const _AppointmentCard(
-                  doctorName: 'Dr. Emily Martinez',
-                  specialty: 'Cardiologist',
-                  hospital: 'City General Hospital',
-                  date: 'Mar 25',
-                  time: '10:00 AM',
-                  status: 'Confirmed',
-                  statusColor: Color(0xFF2E7D32),
-                ),
-                const SizedBox(height: 12),
-                const _AppointmentCard(
-                  doctorName: 'Dr. James Wilson',
-                  specialty: 'Endocrinologist',
-                  hospital: 'Metro Health Center',
-                  date: 'Mar 28',
-                  time: '2:30 PM',
-                  status: 'Pending',
-                  statusColor: AppColors.accent,
-                ),
-                const SizedBox(height: 24),
-                _SectionHeader(
-                  title: 'Hospitals on VITADATA',
-                  onSeeAll: () => Navigator.pushNamed(context, '/hospital-list'),
-                ),
-                const SizedBox(height: 12),
-              ],
+    final previewAppointments = _appointments.take(2).toList();
+    final previewHospitals = _hospitals.take(3).toList();
+
+    return RefreshIndicator(
+      onRefresh: _loadHomeData,
+      color: AppColors.accent,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _HomeHeader(),
+            const SizedBox(height: 24),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const _SectionHeader(title: 'Your Appointments', onSeeAll: null),
+                  const SizedBox(height: 12),
+                  if (_isLoading)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        child: CircularProgressIndicator(color: AppColors.accent),
+                      ),
+                    )
+                  else if (_errorMessage != null)
+                    _HomeInlineError(message: _errorMessage!, onRetry: _loadHomeData)
+                  else if (previewAppointments.isEmpty)
+                    const _NoAppointmentCard()
+                  else
+                    Column(
+                      children: previewAppointments.map((appointment) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _AppointmentCard(
+                            doctorName:
+                                appointment.doctor?.name ?? 'Doctor appointment',
+                            specialty: appointment.doctor?.specialty ??
+                                'General Practice',
+                            hospital: appointment.hospital?.name ??
+                                appointment.doctor?.hospitalName ??
+                                'VITADATA Hospital',
+                            date: _formatDate(appointment.scheduledTime),
+                            time: _formatTime(appointment.scheduledTime),
+                            status: appointment.status,
+                            statusColor: _statusColor(appointment.status),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  const SizedBox(height: 24),
+                  _SectionHeader(
+                    title: 'Hospitals on VITADATA',
+                    onSeeAll: () => Navigator.pushNamed(context, '/hospital-list'),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+              ),
             ),
-          ),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            child: _HospitalGrid(),
-          ),
-          const SizedBox(height: 20),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: _SectionHeader(
-              title: 'AI Recommended Doctors',
-              onSeeAll: () => Navigator.pushNamed(context, '/doctor-list'),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: _HospitalGrid(hospitals: previewHospitals),
             ),
-          ),
-          const SizedBox(height: 10),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              children: [
-                _DoctorPreviewCard(
-                  name: 'Dr. Emily Martinez',
-                  specialty: 'Cardiologist',
-                  hospital: 'City General Hospital',
-                  aiPick: true,
-                ),
-                SizedBox(height: 10),
-                _DoctorPreviewCard(
-                  name: 'Dr. Sarah Chen',
-                  specialty: 'General Physician',
-                  hospital: 'Sunrise Medical',
-                  aiPick: true,
-                ),
-              ],
+            const SizedBox(height: 20),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: _SectionHeader(
+                title: 'AI Recommended Doctor',
+                onSeeAll: () => Navigator.pushNamed(context, '/doctor-list'),
+              ),
             ),
-          ),
-          const SizedBox(height: 24),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              children: [
-                _MedicationCard(),
-                SizedBox(height: 16),
-                _RecentOrderCard(),
-              ],
+            const SizedBox(height: 10),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: _DoctorPreviewCard(
+                name: 'Dr. Nova Reed',
+                specialty: 'Preventive Medicine',
+                hospital: 'VITADATA AI Assistant',
+                aiPick: true,
+              ),
             ),
-          ),
-          const SizedBox(height: 24),
-        ],
+            const SizedBox(height: 24),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                children: [
+                  _MedicationCard(),
+                  SizedBox(height: 16),
+                  _RecentOrderCard(),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
       ),
     );
   }
@@ -401,17 +493,18 @@ class _SectionHeader extends StatelessWidget {
             fontWeight: FontWeight.w700,
           ),
         ),
-        GestureDetector(
-          onTap: onSeeAll,
-          child: const Text(
-            'See all →',
-            style: TextStyle(
-              color: AppColors.accent,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
+        if (onSeeAll != null)
+          GestureDetector(
+            onTap: onSeeAll,
+            child: const Text(
+              'See all →',
+              style: TextStyle(
+                color: AppColors.accent,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
-        ),
       ],
     );
   }
@@ -521,21 +614,36 @@ class _AppointmentCard extends StatelessWidget {
 // Hospital Grid
 // ─────────────────────────────────────────────────────────────
 class _HospitalGrid extends StatelessWidget {
-  const _HospitalGrid();
+  const _HospitalGrid({required this.hospitals});
 
-  static const _hospitals = [
-    {'name': 'City General Hospital', 'location': 'New York', 'dist': '2.3 km', 'rating': '4.5', 'tags': ['Cardiology', 'Orthopedics']},
-    {'name': 'Metro Health Center', 'location': 'New York', 'dist': '3.1 km', 'rating': '4.7', 'tags': ['Endocrinology', 'Pediatrics']},
-    {'name': 'Sunrise Medical', 'location': 'New York', 'dist': '4.5 km', 'rating': '4.6', 'tags': ['General Medicine', 'Surgery']},
-    {'name': 'Wellness Clinic', 'location': 'New York', 'dist': '5.2 km', 'rating': '4.4', 'tags': ['Family Medicine', 'Psychiatry']},
-  ];
+  final List<PatientHospital> hospitals;
 
   @override
   Widget build(BuildContext context) {
+    if (hospitals.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.cream,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.surface),
+        ),
+        child: const Text(
+          'No hospitals available right now.',
+          style: TextStyle(
+            color: AppColors.brownMid,
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      );
+    }
+
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      itemCount: _hospitals.length,
+      itemCount: hospitals.length,
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         crossAxisSpacing: 12,
@@ -543,25 +651,108 @@ class _HospitalGrid extends StatelessWidget {
         mainAxisExtent: 145,
       ),
       itemBuilder: (context, index) {
-        final h = _hospitals[index];
+        final h = hospitals[index];
         return GestureDetector(
           onTap: () {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => HospitalDetailScreen(hospitalName: h['name'] as String),
+                builder: (_) => HospitalDetailScreen(
+                  hospitalName: h.name,
+                  hospitalId: h.id,
+                ),
               ),
             );
           },
           child: _HospitalCard(
-            name: h['name'] as String,
-            location: h['location'] as String,
-            distance: h['dist'] as String,
-            rating: h['rating'] as String,
-            tags: h['tags'] as List<String>,
+            name: h.name,
+            location: h.city,
+            distance: '${h.doctorCount} doctors',
+            rating: h.rating.toStringAsFixed(1),
+            tags: h.tags,
           ),
         );
       },
+    );
+  }
+}
+
+class _NoAppointmentCard extends StatelessWidget {
+  const _NoAppointmentCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.cream,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.surface),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.event_busy_outlined, color: AppColors.brownMid, size: 20),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'No appointment yet. Book one to see it here.',
+              style: TextStyle(
+                color: AppColors.brownMid,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HomeInlineError extends StatelessWidget {
+  const _HomeInlineError({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.cream,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.surface),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            message,
+            style: const TextStyle(
+              color: AppColors.brownMid,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: onRetry,
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.accent,
+              padding: EdgeInsets.zero,
+              minimumSize: const Size(0, 0),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text(
+              'Retry',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -971,3 +1162,4 @@ class _BottomNav extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────
 // Placeholder Tabs
 // ─────────────────────────────────────────────────────────────
+
