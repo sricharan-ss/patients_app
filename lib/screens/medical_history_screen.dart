@@ -1,19 +1,67 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../core/app_colors.dart';
 import '../services/patient_api_service.dart';
 
-class MedicalHistoryScreen extends StatelessWidget {
+class MedicalHistoryScreen extends StatefulWidget {
   const MedicalHistoryScreen({super.key});
+
+  @override
+  State<MedicalHistoryScreen> createState() => _MedicalHistoryScreenState();
+}
+
+class _MedicalHistoryScreenState extends State<MedicalHistoryScreen> {
+  bool _isLoading = true;
+  String? _errorMessage;
+  int _prescriptionCount = 0;
+  int _labReportCount = 0;
+  int _appointmentCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSummary();
+  }
+
+  Future<void> _loadSummary() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final records = await PatientApiService.getRecords();
+      if (!mounted) return;
+      setState(() {
+        _prescriptionCount = records.prescriptions.length;
+        _labReportCount = records.labReports.length;
+        _appointmentCount = records.appointments.length;
+        _isLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = error.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  String _countLabel(int count) {
+    return '$count record${count == 1 ? '' : 's'}';
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.warmWhite,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
-          child: Column(
+        child: RefreshIndicator(
+          onRefresh: _loadSummary,
+          color: AppColors.accent,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
             children: [
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -29,8 +77,7 @@ class MedicalHistoryScreen extends StatelessWidget {
                     ),
                     const Spacer(),
                     IconButton(
-                      onPressed: () =>
-                          Navigator.pushNamed(context, '/settings'),
+                      onPressed: () => Navigator.pushNamed(context, '/settings'),
                       icon: const Icon(
                         Icons.settings_outlined,
                         color: AppColors.brownDeep,
@@ -41,10 +88,29 @@ class MedicalHistoryScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
+              if (_isLoading)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 12),
+                  child: Center(
+                    child: CircularProgressIndicator(color: AppColors.accent),
+                  ),
+                )
+              else if (_errorMessage != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Text(
+                    _errorMessage!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: AppColors.brownMid,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
               _HistoryCategoryCard(
                 icon: Icons.description_outlined,
                 title: 'Prescriptions',
-                subtitle: '3 records',
+                subtitle: _countLabel(_prescriptionCount),
                 onTap: () {
                   Navigator.push(
                     context,
@@ -58,7 +124,7 @@ class MedicalHistoryScreen extends StatelessWidget {
               _HistoryCategoryCard(
                 icon: Icons.science_outlined,
                 title: 'Lab Reports',
-                subtitle: '3 records',
+                subtitle: _countLabel(_labReportCount),
                 onTap: () {
                   Navigator.push(
                     context,
@@ -70,7 +136,7 @@ class MedicalHistoryScreen extends StatelessWidget {
               _HistoryCategoryCard(
                 icon: Icons.calendar_today_outlined,
                 title: 'Appointment History',
-                subtitle: '3 records',
+                subtitle: _countLabel(_appointmentCount),
                 onTap: () {
                   Navigator.push(
                     context,
@@ -115,6 +181,7 @@ class PrescriptionsScreen extends StatelessWidget {
               item['generatedAt'] ??
                   (encounter is Map ? encounter['scheduledTime'] : null),
             ),
+            pdfUrl: item['pdfUrl']?.toString(),
           );
         }).toList();
       },
@@ -145,6 +212,7 @@ class LabReportsScreen extends StatelessWidget {
                 'Uploaded',
             source: _nestedString(hospital, 'name', 'VITADATA Lab'),
             date: _formatDate(item['reportedAt']),
+            pdfUrl: item['pdfUrl']?.toString(),
           );
         }).toList();
       },
@@ -161,13 +229,14 @@ class AppointmentHistoryScreen extends StatelessWidget {
       title: 'Appointment History',
       searchHint: 'Search appointments...',
       loader: () async {
-        final records = await PatientApiService.getRecords();
-        return records.appointments.map((appointment) {
+        final appointments = await PatientApiService.getAppointments();
+        return appointments.map((appointment) {
           return _HistoryRecord(
             primary: appointment.doctor?.name ?? 'Doctor appointment',
-            secondary: '${appointment.status} • Token ${appointment.tokenNo}',
+            secondary: '${appointment.status} - Token ${appointment.tokenNo}',
             source: appointment.hospital?.name ?? 'VITADATA Hospital',
             date: _formatDate(appointment.scheduledTime),
+            pdfUrl: null,
           );
         }).toList();
       },
@@ -463,6 +532,7 @@ class _HistoryRecordCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasPdf = (record.pdfUrl ?? '').trim().isNotEmpty;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -531,11 +601,11 @@ class _HistoryRecordCard extends StatelessWidget {
                 ),
               ),
               GestureDetector(
-                onTap: () {},
-                child: const Text(
-                  'View PDF +',
+                onTap: hasPdf ? () {} : null,
+                child: Text(
+                  hasPdf ? 'View PDF +' : 'PDF not uploaded',
                   style: TextStyle(
-                    color: AppColors.accent,
+                    color: hasPdf ? AppColors.accent : AppColors.brownLight,
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
                   ),
@@ -555,10 +625,15 @@ class _HistoryRecord {
     required this.secondary,
     required this.source,
     required this.date,
+    required this.pdfUrl,
   });
 
   final String primary;
   final String secondary;
   final String source;
   final String date;
+  final String? pdfUrl;
 }
+
+
+
