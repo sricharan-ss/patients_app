@@ -409,5 +409,10 @@ List<String> _stringList(dynamic value) {
 }
 
 List<Map<String, dynamic>> _mapList(dynamic value) {
-  return _list(value).whereType<Map<String, dynamic>>().toList();
+  return _list(value)
+      .whereType<Map>()
+      .map((item) => item.map(
+            (key, val) => MapEntry(key.toString(), val),
+          ))
+      .toList();
 }
