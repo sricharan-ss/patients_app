@@ -379,6 +379,15 @@ class _HomeHeader extends StatelessWidget {
                   const Spacer(),
                   InkWell(
                     borderRadius: BorderRadius.circular(18),
+                    onTap: () => Navigator.pushNamed(context, '/notifications'),
+                    child: const Padding(
+                      padding: EdgeInsets.all(4),
+                      child: Icon(Icons.notifications_none, color: AppColors.cream, size: 26),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(18),
                     onTap: () => Navigator.pushNamed(context, '/settings'),
                     child: const Padding(
                       padding: EdgeInsets.all(4),

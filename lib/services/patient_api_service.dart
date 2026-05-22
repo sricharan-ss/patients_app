@@ -48,6 +48,10 @@ class PatientApiService {
     return data.map(PatientDoctor.fromJson).toList();
   }
 
+  static Future<Map<String, dynamic>> getDoctor(String doctorId) {
+    return _getMap('/api/mobile/patient/doctors/$doctorId');
+  }
+
   static Future<List<PatientSlot>> getDoctorSlots({
     required String doctorId,
     required DateTime date,
@@ -93,6 +97,11 @@ class PatientApiService {
 
   static Future<Map<String, dynamic>> getMedicationDashboard() async {
     return _getMap('/api/mobile/patient/medications/dashboard');
+  }
+
+  static Future<List<Map<String, dynamic>>> getOrderableMedicines() async {
+    final data = await _getList('/api/mobile/patient/medications/orderable');
+    return _mapList(data);
   }
 
   static Future<List<Map<String, dynamic>>> getMedicationOrders({
@@ -147,6 +156,59 @@ class PatientApiService {
     });
   }
 
+  static Future<Map<String, dynamic>> markMedicationTaken(String scheduleId) {
+    return _postMap('/api/mobile/patient/medications/schedules/$scheduleId/taken', {});
+  }
+
+  static Future<Map<String, dynamic>> updateMedicationScheduleStatus({
+    required String scheduleId,
+    required String action,
+  }) {
+    return _patchMap('/api/mobile/patient/medications/schedules/$scheduleId/status', {
+      'action': action,
+    });
+  }
+
+  static Future<List<Map<String, dynamic>>> createMedicationSchedulesFromPrescription({
+    required String prescriptionId,
+    DateTime? startDate,
+  }) async {
+    final decoded = await _request(
+      () => http.post(
+        _uri('/api/mobile/patient/medications/schedules/from-prescription'),
+        headers: _headers(),
+        body: jsonEncode({
+          'prescriptionId': prescriptionId,
+          if (startDate != null) 'startDate': startDate.toUtc().toIso8601String(),
+        }),
+      ),
+    );
+    return _mapList(decoded['data']);
+  }
+
+  static Future<Map<String, dynamic>> cancelMedicationOrder(String orderId) {
+    return _postMap('/api/mobile/patient/medications/orders/$orderId/cancel', {});
+  }
+
+  static Future<List<Map<String, dynamic>>> getNotifications({
+    bool unreadOnly = false,
+    int limit = 50,
+  }) async {
+    final data = await _getList('/api/mobile/patient/notifications', {
+      'unreadOnly': unreadOnly ? 'true' : null,
+      'limit': '$limit',
+    });
+    return _mapList(data);
+  }
+
+  static Future<Map<String, dynamic>> markNotificationRead(String notificationId) {
+    return _postMap('/api/mobile/patient/notifications/$notificationId/read', {});
+  }
+
+  static Future<Map<String, dynamic>> toggleFavoriteDoctor(String doctorId) {
+    return _postMap('/api/mobile/patient/doctors/$doctorId/favorite', {});
+  }
+
   static Future<List<dynamic>> _getList(
     String path, [
     Map<String, String?> query = const {},
@@ -174,6 +236,18 @@ class PatientApiService {
   ) async {
     final decoded = await _request(
       () => http.post(_uri(path), headers: _headers(), body: jsonEncode(body)),
+    );
+    final data = decoded['data'];
+    if (data is Map<String, dynamic>) return data;
+    return <String, dynamic>{};
+  }
+
+  static Future<Map<String, dynamic>> _patchMap(
+    String path,
+    Map<String, dynamic> body,
+  ) async {
+    final decoded = await _request(
+      () => http.patch(_uri(path), headers: _headers(), body: jsonEncode(body)),
     );
     final data = decoded['data'];
     if (data is Map<String, dynamic>) return data;

@@ -19,6 +19,7 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
   List<Map<String, dynamic>> _todaySchedule = const [];
   List<Map<String, dynamic>> _refillAlerts = const [];
   List<Map<String, dynamic>> _orders = const [];
+  final Set<String> _updatingScheduleIds = <String>{};
 
   @override
   void initState() {
@@ -67,6 +68,53 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
     return lastTakenAt.year == now.year &&
         lastTakenAt.month == now.month &&
         lastTakenAt.day == now.day;
+  }
+
+  Future<void> _markTaken(Map<String, dynamic> schedule) async {
+    final id = _text(schedule['id']);
+    if (id.isEmpty || _updatingScheduleIds.contains(id)) return;
+
+    setState(() => _updatingScheduleIds.add(id));
+    try {
+      await PatientApiService.markMedicationTaken(id);
+      await _loadMedicationDashboard();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Medication marked as taken')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString())),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _updatingScheduleIds.remove(id));
+      }
+    }
+  }
+
+  Future<void> _changeScheduleStatus(Map<String, dynamic> schedule, String action) async {
+    final id = _text(schedule['id']);
+    if (id.isEmpty || _updatingScheduleIds.contains(id)) return;
+
+    setState(() => _updatingScheduleIds.add(id));
+    try {
+      await PatientApiService.updateMedicationScheduleStatus(
+        scheduleId: id,
+        action: action,
+      );
+      await _loadMedicationDashboard();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString())),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _updatingScheduleIds.remove(id));
+      }
+    }
   }
 
   @override
@@ -187,11 +235,15 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
                   ),
                 ..._todaySchedule.map((med) {
                   final isDone = _isTakenToday(med);
+                  final scheduleId = _text(med['id']);
+                  final medStatus = _text(med['status'], 'ACTIVE').toUpperCase();
+                  final isPaused = medStatus == 'PAUSED';
+                  final isUpdating = _updatingScheduleIds.contains(scheduleId);
                   final status = isDone ? 'Done' : 'Pending';
                   final statusBgColor =
-                      isDone ? Colors.green.shade100 : Colors.amber.shade100;
+                      isPaused ? Colors.grey.shade200 : (isDone ? Colors.green.shade100 : Colors.amber.shade100);
                   final statusTextColor =
-                      isDone ? Colors.green.shade700 : Colors.amber.shade700;
+                      isPaused ? Colors.grey.shade700 : (isDone ? Colors.green.shade700 : Colors.amber.shade700);
 
                   return Container(
                     margin: const EdgeInsets.only(bottom: 8),
@@ -201,45 +253,79 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
                       border: Border.all(color: const Color(0xFFEFE2CC)),
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: Row(
+                    child: Column(
                       children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '${_text(med['medicineName'], 'Medicine')} ${_text(med['dosage'])}',
-                                style: const TextStyle(
-                                  color: Color(0xFF3B1F0A),
-                                  fontSize: 14,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${_text(med['medicineName'], 'Medicine')} ${_text(med['dosage'])}',
+                                    style: const TextStyle(
+                                      color: Color(0xFF3B1F0A),
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${_formatTime(_text(med['timeOfDay']))}${isPaused ? ' - paused' : ''}',
+                                    style: const TextStyle(
+                                      color: Color(0xFF6B3A1F),
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: statusBgColor,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                isPaused ? 'Paused' : status,
+                                style: TextStyle(
+                                  color: statusTextColor,
+                                  fontSize: 11,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                _formatTime(_text(med['timeOfDay'])),
-                                style: const TextStyle(
-                                  color: Color(0xFF6B3A1F),
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: statusBgColor,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            status,
-                            style: TextStyle(
-                              color: statusTextColor,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
                             ),
-                          ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: isUpdating || isDone || isPaused ? null : () => _markTaken(med),
+                                icon: isUpdating
+                                    ? const SizedBox(
+                                        width: 14,
+                                        height: 14,
+                                        child: CircularProgressIndicator(strokeWidth: 2),
+                                      )
+                                    : const Icon(Icons.check_circle_outline, size: 16),
+                                label: const Text('Mark Taken'),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            PopupMenuButton<String>(
+                              enabled: !isUpdating,
+                              onSelected: (action) => _changeScheduleStatus(med, action),
+                              itemBuilder: (_) => [
+                                PopupMenuItem(
+                                  value: isPaused ? 'resume' : 'pause',
+                                  child: Text(isPaused ? 'Resume' : 'Pause'),
+                                ),
+                                const PopupMenuItem(value: 'cancel', child: Text('Cancel')),
+                              ],
+                            ),
+                          ],
                         ),
                       ],
                     ),

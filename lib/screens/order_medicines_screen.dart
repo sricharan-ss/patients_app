@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/app_colors.dart';
+import '../services/patient_api_service.dart';
 
 class OrderMedicinesScreen extends StatefulWidget {
   const OrderMedicinesScreen({
@@ -19,14 +20,11 @@ class OrderMedicinesScreen extends StatefulWidget {
 class _OrderMedicinesScreenState extends State<OrderMedicinesScreen> {
   final TextEditingController _searchController = TextEditingController();
   final Map<String, int> _cart = {};
+  List<Map<String, dynamic>> _medicines = const [];
   String _searchQuery = '';
-
-  final List<Map<String, dynamic>> _previouslyOrdered = [
-    {'id': '1', 'name': 'Metformin', 'dosage': '500mg', 'price': 12.99},
-    {'id': '2', 'name': 'Lisinopril', 'dosage': '10mg', 'price': 18.99},
-    {'id': '3', 'name': 'Aspirin', 'dosage': '75mg', 'price': 8.99},
-    {'id': '4', 'name': 'Vitamin D3', 'dosage': '1000 IU', 'price': 15.99},
-  ];
+  bool _isLoading = true;
+  bool _isSubmitting = false;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -34,6 +32,7 @@ class _OrderMedicinesScreenState extends State<OrderMedicinesScreen> {
     if (widget.initialCart != null) {
       _cart.addAll(widget.initialCart!);
     }
+    _loadMedicines();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || widget.initialOrderId == null || _cartItemCount == 0) {
@@ -47,6 +46,28 @@ class _OrderMedicinesScreenState extends State<OrderMedicinesScreen> {
         ),
       );
     });
+  }
+
+  Future<void> _loadMedicines() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final medicines = await PatientApiService.getOrderableMedicines();
+      if (!mounted) return;
+      setState(() {
+        _medicines = medicines;
+        _isLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = error.toString();
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -70,9 +91,9 @@ class _OrderMedicinesScreenState extends State<OrderMedicinesScreen> {
   List<Map<String, dynamic>> get _filteredItems {
     final query = _searchQuery.trim().toLowerCase();
     if (query.isEmpty) {
-      return _previouslyOrdered;
+      return _medicines;
     }
-    return _previouslyOrdered.where((item) {
+    return _medicines.where((item) {
       final label = '${item['name']} ${item['dosage']}'.toLowerCase();
       return label.contains(query);
     }).toList();
@@ -81,9 +102,9 @@ class _OrderMedicinesScreenState extends State<OrderMedicinesScreen> {
   double get _cartTotal {
     var total = 0.0;
     _cart.forEach((id, qty) {
-      final matching = _previouslyOrdered.where((item) => item['id'] == id);
+      final matching = _medicines.where((item) => _text(item['id']) == id);
       if (matching.isNotEmpty) {
-        total += (matching.first['price'] as double) * qty;
+        total += _toDouble(matching.first['price']) * qty;
       }
     });
     return total;
@@ -97,16 +118,57 @@ class _OrderMedicinesScreenState extends State<OrderMedicinesScreen> {
     return count;
   }
 
-  void _placeOrder() {
-    final orderTotal = _cartTotal.toStringAsFixed(2);
-    setState(_cart.clear);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Order placed successfully. Total: \$$orderTotal'),
-        backgroundColor: AppColors.brownDeep,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+  Future<void> _placeOrder() async {
+    if (_cart.isEmpty || _isSubmitting) return;
+    setState(() => _isSubmitting = true);
+
+    try {
+      final items = _cart.entries.map((entry) {
+        final med = _medicines.firstWhere(
+          (item) => _text(item['id']) == entry.key,
+          orElse: () => const <String, dynamic>{},
+        );
+        return {
+          'medicineId': _text(med['medicineId'], entry.key),
+          if (_text(med['prescriptionMedicineId']).isNotEmpty)
+            'prescriptionMedicineId': _text(med['prescriptionMedicineId']),
+          'quantity': entry.value,
+          if (_text(med['dosage']).isNotEmpty) 'dosage': _text(med['dosage']),
+          if (_text(med['frequency']).isNotEmpty) 'frequency': _text(med['frequency']),
+          if (_toInt(med['durationDays']) > 0) 'durationDays': _toInt(med['durationDays']),
+          if (_toDouble(med['price']) > 0) 'unitPrice': _toDouble(med['price']),
+        };
+      }).toList();
+
+      final first = _medicines.firstWhere(
+        (item) => _cart.containsKey(_text(item['id'])),
+        orElse: () => const <String, dynamic>{},
+      );
+      await PatientApiService.createMedicationOrder(
+        hospitalId: _text(first['hospitalId']),
+        sourcePrescriptionId: _text(first['prescriptionId']),
+        orderType: widget.initialOrderId == null ? 'NEW' : 'REORDER',
+        items: items,
+      );
+
+      if (!mounted) return;
+      setState(_cart.clear);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Order placed successfully'),
+          backgroundColor: AppColors.brownDeep,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      Navigator.pop(context);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString())),
+      );
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 
   @override
@@ -163,7 +225,7 @@ class _OrderMedicinesScreenState extends State<OrderMedicinesScreen> {
                   ),
                   const SizedBox(height: 20),
                   const Text(
-                    'Previously Ordered',
+                    'Available From Prescriptions',
                     style: TextStyle(
                       color: AppColors.brownDeep,
                       fontSize: 15,
@@ -171,7 +233,25 @@ class _OrderMedicinesScreenState extends State<OrderMedicinesScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  if (items.isEmpty)
+                  if (_isLoading)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 40),
+                      child: Center(child: CircularProgressIndicator(color: AppColors.accent)),
+                    )
+                  else if (_errorMessage != null)
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.cream,
+                        border: Border.all(color: AppColors.surface),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Text(
+                        _errorMessage!,
+                        style: const TextStyle(color: AppColors.brownMid, fontSize: 13),
+                      ),
+                    )
+                  else if (items.isEmpty)
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -185,7 +265,7 @@ class _OrderMedicinesScreenState extends State<OrderMedicinesScreen> {
                       ),
                     ),
                   ...items.map((item) {
-                    final id = item['id'] as String;
+                    final id = _text(item['id']);
                     final qty = _cart[id] ?? 0;
                     return Container(
                       margin: const EdgeInsets.only(bottom: 8),
@@ -210,7 +290,9 @@ class _OrderMedicinesScreenState extends State<OrderMedicinesScreen> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            '\$${(item['price'] as double).toStringAsFixed(2)}',
+                            _toDouble(item['price']) > 0
+                                ? 'Rs. ${_toDouble(item['price']).toStringAsFixed(2)}'
+                                : 'Prescription medicine',
                             style: const TextStyle(
                               color: AppColors.accent,
                               fontSize: 13,
@@ -334,7 +416,7 @@ class _OrderMedicinesScreenState extends State<OrderMedicinesScreen> {
                           ),
                           const SizedBox(width: 12),
                           Text(
-                            '\$${_cartTotal.toStringAsFixed(2)}',
+                            'Rs. ${_cartTotal.toStringAsFixed(2)}',
                             style: const TextStyle(
                               color: AppColors.brownDeep,
                               fontSize: 18,
@@ -347,9 +429,9 @@ class _OrderMedicinesScreenState extends State<OrderMedicinesScreen> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
-                          onPressed: _placeOrder,
+                          onPressed: _isSubmitting ? null : _placeOrder,
                           icon: const Icon(Icons.shopping_cart_outlined, size: 20),
-                          label: const Text('Place Order'),
+                          label: Text(_isSubmitting ? 'Placing...' : 'Place Order'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.brownDeep,
                             foregroundColor: AppColors.cream,
@@ -368,6 +450,23 @@ class _OrderMedicinesScreenState extends State<OrderMedicinesScreen> {
         ),
       ),
     );
+  }
+
+  String _text(dynamic value, [String fallback = '']) {
+    if (value == null) return fallback;
+    final text = value.toString().trim();
+    return text.isEmpty ? fallback : text;
+  }
+
+  int _toInt(dynamic value, [int fallback = 0]) {
+    if (value is int) return value;
+    if (value is num) return value.round();
+    return int.tryParse(value?.toString() ?? '') ?? fallback;
+  }
+
+  double _toDouble(dynamic value, [double fallback = 0]) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '') ?? fallback;
   }
 }
 

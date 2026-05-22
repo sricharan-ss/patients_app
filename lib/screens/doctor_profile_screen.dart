@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
+import '../services/patient_api_service.dart';
 import 'book_appointment_screen.dart';
 
 class DoctorProfileScreen extends StatefulWidget {
@@ -34,11 +35,12 @@ class DoctorProfileScreen extends StatefulWidget {
 
 class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
   bool _isFavorite = false;
+  bool _isFavoriteLoading = false;
 
   final _schedule = [
     {
-      'day': 'Mon – Fri',
-      'time': '9:00 AM – 6:00 PM',
+      'day': 'Mon - Fri',
+      'time': '9:00 AM - 6:00 PM',
       'available': true,
       'isWeekday': true,
     },
@@ -52,6 +54,39 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _loadFavoriteState();
+  }
+
+  Future<void> _loadFavoriteState() async {
+    try {
+      final doctor = await PatientApiService.getDoctor(widget.id);
+      if (!mounted) return;
+      setState(() => _isFavorite = doctor['isFavorite'] == true);
+    } catch (_) {
+      // Keep the local default if the profile detail request fails.
+    }
+  }
+
+  Future<void> _toggleFavorite() async {
+    if (_isFavoriteLoading) return;
+    setState(() => _isFavoriteLoading = true);
+    try {
+      final result = await PatientApiService.toggleFavoriteDoctor(widget.id);
+      if (!mounted) return;
+      setState(() => _isFavorite = result['isFavorite'] == true);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString())),
+      );
+    } finally {
+      if (mounted) setState(() => _isFavoriteLoading = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFFFFDF8),
@@ -59,7 +94,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
         children: [
           Column(
             children: [
-              // ─── Brown Header ──────────────────────────────────────────
+              // Brown Header
               Container(
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
@@ -105,8 +140,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                                   ? const Color(0xFFD4822A)
                                   : const Color(0xFFFBF6EC),
                             ),
-                            onPressed: () =>
-                                setState(() => _isFavorite = !_isFavorite),
+                            onPressed: _isFavoriteLoading ? null : _toggleFavorite,
                           ),
                         ),
                       ],
@@ -115,7 +149,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                 ),
               ),
 
-              // ─── Content ───────────────────────────────────────────────
+              // Content
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.only(
@@ -707,7 +741,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
             ],
           ),
 
-          // ─── Pinned Bottom Button ──────────────────────────────────────
+          // Pinned Bottom Button
           Positioned(
             left: 0,
             right: 0,

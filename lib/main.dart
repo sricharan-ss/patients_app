@@ -14,6 +14,7 @@ import 'screens/faq_screen.dart';
 import 'screens/hospital_list_screen.dart';
 import 'screens/doctor_list_screen.dart';
 import 'screens/search_results_screen.dart';
+import 'screens/notification_center_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -87,6 +88,10 @@ class VitaDataApp extends StatelessWidget {
           case '/search-results':
             return MaterialPageRoute(
               builder: (_) => const SearchResultsScreen(),
+            );
+          case '/notifications':
+            return MaterialPageRoute(
+              builder: (_) => const NotificationCenterScreen(),
             );
           default:
             return MaterialPageRoute(builder: (_) => const LandingPage());

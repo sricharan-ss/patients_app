@@ -45,6 +45,22 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     }
   }
 
+  Future<void> _cancelOrder() async {
+    try {
+      await PatientApiService.cancelMedicationOrder(widget.orderId);
+      await _loadOrder();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Order cancelled')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString())),
+      );
+    }
+  }
+
   List<Map<String, dynamic>> _buildSteps(String status) {
     final steps = ['PLACED', 'CONFIRMED', 'DISPATCHED', 'DELIVERED'];
     final activeIndex = steps.indexOf(status);
@@ -89,6 +105,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     final status = _text(_order['status'], 'PLACED').toUpperCase();
     final steps = _buildSteps(status);
     final items = _mapList(_order['items']);
+    final canCancel = ['DRAFT', 'PLACED', 'CONFIRMED'].contains(status);
 
     return Scaffold(
       backgroundColor: const Color(0xFFFFFDF8),
@@ -158,6 +175,17 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                                 style: const TextStyle(
                                   color: Color(0xFF6B3A1F),
                                   fontSize: 12,
+                                ),
+                              ),
+                            ],
+                            if (canCancel) ...[
+                              const SizedBox(height: 12),
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton.icon(
+                                  onPressed: _cancelOrder,
+                                  icon: const Icon(Icons.cancel_outlined, size: 16),
+                                  label: const Text('Cancel Order'),
                                 ),
                               ),
                             ],
