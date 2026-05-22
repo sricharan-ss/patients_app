@@ -1,30 +1,105 @@
 import 'package:flutter/material.dart';
 
+import '../services/patient_api_service.dart';
+
 class RefillPageScreen extends StatefulWidget {
-  const RefillPageScreen({super.key});
+  const RefillPageScreen({
+    super.key,
+    this.initialItems = const [],
+  });
+
+  final List<Map<String, dynamic>> initialItems;
 
   @override
   State<RefillPageScreen> createState() => _RefillPageScreenState();
 }
 
 class _RefillPageScreenState extends State<RefillPageScreen> {
-  final List<Map<String, dynamic>> medicationsRefill = [
-    {
-      'id': '1',
-      'name': 'Lisinopril',
-      'dosage': '10mg',
-      'refillDate': '2026-04-10T00:00:00Z',
-    }
-  ];
-
-  late Map<String, dynamic> selectedMed;
+  late final List<Map<String, dynamic>> medicationsRefill;
+  Map<String, dynamic>? selectedMed;
   int quantity = 30;
-  String deliveryDate = '2026-03-26';
+  String deliveryDate = DateTime.now()
+      .add(const Duration(days: 2))
+      .toIso8601String()
+      .split('T')[0];
+  bool _isSubmitting = false;
 
   @override
   void initState() {
     super.initState();
-    selectedMed = medicationsRefill[0];
+    medicationsRefill = _buildRefillItems(widget.initialItems);
+    if (medicationsRefill.isNotEmpty) {
+      selectedMed = medicationsRefill.first;
+    }
+  }
+
+  List<Map<String, dynamic>> _buildRefillItems(List<Map<String, dynamic>> incoming) {
+    if (incoming.isNotEmpty) {
+      return incoming.map((item) {
+        final medicineId = _text(item['medicineId'], _text(item['id']));
+        return {
+          'id': _text(item['id'], medicineId),
+          'medicineId': medicineId,
+          'hospitalId': _text(item['hospitalId']),
+          'name': _text(item['medicineName'], 'Medicine'),
+          'dosage': _text(item['dosage'], ''),
+          'refillDate': DateTime.now().toUtc().toIso8601String(),
+        };
+      }).toList();
+    }
+
+    return [
+      {
+        'id': 'local-1',
+        'medicineId': '',
+        'hospitalId': '',
+        'name': 'Medication',
+        'dosage': '',
+        'refillDate': DateTime.now().toUtc().toIso8601String(),
+      },
+    ];
+  }
+
+  Future<void> _submitRefill() async {
+    if (selectedMed == null) return;
+    final medicineId = _text(selectedMed!['medicineId']);
+    if (medicineId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Medicine id is missing for this refill item')),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    try {
+      final expected = DateTime.tryParse('${deliveryDate}T10:00:00');
+      await PatientApiService.createMedicationRefill(
+        hospitalId: _text(selectedMed!['hospitalId']),
+        notes: expected == null ? null : 'Requested delivery on $deliveryDate',
+        items: [
+          {
+            'medicineId': medicineId,
+            'quantity': quantity,
+            'dosage': _text(selectedMed!['dosage']),
+          },
+        ],
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Refill order placed successfully!')),
+      );
+      Navigator.pop(context);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString())),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
   }
 
   @override
@@ -49,7 +124,6 @@ class _RefillPageScreenState extends State<RefillPageScreen> {
           ListView(
             padding: const EdgeInsets.fromLTRB(16, 20, 16, 120),
             children: [
-              // Medication Selection
               const Text(
                 'Select Medication',
                 style: TextStyle(
@@ -59,7 +133,7 @@ class _RefillPageScreenState extends State<RefillPageScreen> {
               ),
               const SizedBox(height: 12),
               ...medicationsRefill.map((med) {
-                final isSelected = selectedMed['id'] == med['id'];
+                final isSelected = selectedMed?['id'] == med['id'];
                 return GestureDetector(
                   onTap: () => setState(() => selectedMed = med),
                   child: Container(
@@ -77,7 +151,7 @@ class _RefillPageScreenState extends State<RefillPageScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '${med['name']} ${med['dosage']}',
+                          '${_text(med['name'])} ${_text(med['dosage'])}',
                           style: const TextStyle(
                             color: Color(0xFF3B1F0A),
                             fontSize: 14,
@@ -86,7 +160,7 @@ class _RefillPageScreenState extends State<RefillPageScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Current refill due: ${_formatDate(med['refillDate'])}',
+                          'Current refill due: ${_formatDate(_text(med['refillDate']))}',
                           style: TextStyle(
                             color: Colors.amber.shade700,
                             fontSize: 12,
@@ -99,7 +173,6 @@ class _RefillPageScreenState extends State<RefillPageScreen> {
               }),
               const SizedBox(height: 20),
 
-              // Quantity
               const Text(
                 'Quantity (pills)',
                 style: TextStyle(
@@ -133,7 +206,6 @@ class _RefillPageScreenState extends State<RefillPageScreen> {
               ),
               const SizedBox(height: 20),
 
-              // Delivery Date placeholder (TextField)
               const Text(
                 'Preferred Delivery Date',
                 style: TextStyle(
@@ -172,122 +244,8 @@ class _RefillPageScreenState extends State<RefillPageScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
-
-              // Prescription Info
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  border: Border.all(color: Colors.blue.shade200),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Prescription on file',
-                      style: TextStyle(
-                        color: Colors.blue.shade900,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Your previous prescription from Dr. Emily Martinez is valid for this refill.',
-                      style: TextStyle(
-                        color: Colors.blue.shade700,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // Delivery Address
-              const Text(
-                'Delivery Address',
-                style: TextStyle(
-                  color: Color(0xFFA0622A),
-                  fontSize: 13,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFBF6EC),
-                  border: Border.all(color: const Color(0xFFEFE2CC)),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Home',
-                      style: TextStyle(
-                        color: Color(0xFF3B1F0A),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      '123 Main Street, Apt 4B\nNew York, NY 10001',
-                      style: TextStyle(
-                        color: Color(0xFF6B3A1F),
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // Price Summary
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFBF6EC),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Medication', style: TextStyle(color: Color(0xFF6B3A1F), fontSize: 13)),
-                        Text('\$25.99', style: TextStyle(color: Color(0xFF3B1F0A), fontSize: 14)),
-                      ],
-                    ),
-                    SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Delivery', style: TextStyle(color: Color(0xFF6B3A1F), fontSize: 13)),
-                        Text('\$4.99', style: TextStyle(color: Color(0xFF3B1F0A), fontSize: 14)),
-                      ],
-                    ),
-                    Padding(
-                      padding: EdgeInsets.symmetric(vertical: 12),
-                      child: Divider(color: Color(0xFFEFE2CC), height: 1),
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Total', style: TextStyle(color: Color(0xFF3B1F0A), fontSize: 15, fontWeight: FontWeight.w500)),
-                        Text('\$30.98', style: TextStyle(color: Color(0xFF3B1F0A), fontSize: 18, fontWeight: FontWeight.w500)),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
             ],
           ),
-
-          // Bottom Bar
           Positioned(
             left: 0,
             right: 0,
@@ -299,24 +257,37 @@ class _RefillPageScreenState extends State<RefillPageScreen> {
                 border: Border(top: BorderSide(color: Color(0xFFEFE2CC))),
               ),
               child: ElevatedButton(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Refill order placed successfully!'))
-                  );
-                  Navigator.pop(context);
-                },
+                onPressed: _isSubmitting ? null : _submitRefill,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF3B1F0A),
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
-                child: const Text('Confirm Refill Order', style: TextStyle(color: Color(0xFFFBF6EC), fontSize: 15)),
+                child: _isSubmitting
+                    ? const SizedBox(
+                        height: 22,
+                        width: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Color(0xFFFBF6EC),
+                        ),
+                      )
+                    : const Text(
+                        'Confirm Refill Order',
+                        style: TextStyle(color: Color(0xFFFBF6EC), fontSize: 15),
+                      ),
               ),
             ),
-          )
+          ),
         ],
       ),
     );
+  }
+
+  String _text(dynamic value, [String fallback = '']) {
+    if (value == null) return fallback;
+    final text = value.toString().trim();
+    return text.isEmpty ? fallback : text;
   }
 
   String _formatDate(String isoString) {

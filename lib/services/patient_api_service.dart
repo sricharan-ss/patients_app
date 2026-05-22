@@ -91,6 +91,62 @@ class PatientApiService {
     return PatientRecords.fromJson(data);
   }
 
+  static Future<Map<String, dynamic>> getMedicationDashboard() async {
+    return _getMap('/api/mobile/patient/medications/dashboard');
+  }
+
+  static Future<List<Map<String, dynamic>>> getMedicationOrders({
+    String? status,
+    int? limit,
+  }) async {
+    final data = await _getList('/api/mobile/patient/medications/orders', {
+      'status': status,
+      if (limit != null) 'limit': '$limit',
+    });
+    return _mapList(data);
+  }
+
+  static Future<Map<String, dynamic>> getMedicationOrderById(String orderId) async {
+    return _getMap('/api/mobile/patient/medications/orders/$orderId');
+  }
+
+  static Future<Map<String, dynamic>> createMedicationRefill({
+    String? prescriptionId,
+    String? hospitalId,
+    String? notes,
+    List<Map<String, dynamic>> items = const [],
+  }) async {
+    return _postMap('/api/mobile/patient/medications/refill', {
+      if (prescriptionId != null && prescriptionId.trim().isNotEmpty)
+        'prescriptionId': prescriptionId.trim(),
+      if (hospitalId != null && hospitalId.trim().isNotEmpty)
+        'hospitalId': hospitalId.trim(),
+      if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
+      if (items.isNotEmpty) 'items': items,
+    });
+  }
+
+  static Future<Map<String, dynamic>> createMedicationOrder({
+    String? hospitalId,
+    String? sourcePrescriptionId,
+    String orderType = 'NEW',
+    String? notes,
+    DateTime? expectedDeliveryAt,
+    List<Map<String, dynamic>> items = const [],
+  }) async {
+    return _postMap('/api/mobile/patient/medications/orders', {
+      if (hospitalId != null && hospitalId.trim().isNotEmpty)
+        'hospitalId': hospitalId.trim(),
+      if (sourcePrescriptionId != null && sourcePrescriptionId.trim().isNotEmpty)
+        'sourcePrescriptionId': sourcePrescriptionId.trim(),
+      'orderType': orderType,
+      if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
+      if (expectedDeliveryAt != null)
+        'expectedDeliveryAt': expectedDeliveryAt.toUtc().toIso8601String(),
+      'items': items,
+    });
+  }
+
   static Future<List<dynamic>> _getList(
     String path, [
     Map<String, String?> query = const {},

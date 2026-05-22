@@ -1,29 +1,67 @@
 import 'package:flutter/material.dart';
 
 import '../core/app_colors.dart';
-import 'order_medicines_screen.dart';
+import '../services/patient_api_service.dart';
+import 'order_tracking_screen.dart';
 
-class OrderHistoryScreen extends StatelessWidget {
+class OrderHistoryScreen extends StatefulWidget {
   const OrderHistoryScreen({super.key});
 
-  static const List<Map<String, dynamic>> _orders = [
-    {
-      'id': 'ORD-001234',
-      'status': 'Out for Delivery',
-      'items': ['Metformin 500mg x 60', 'Lisinopril 10mg x 30'],
-      'date': '2026-03-20T00:00:00Z',
-      'total': 45.99,
-      'cart': {'1': 1, '2': 1},
-    },
-    {
-      'id': 'ORD-001235',
-      'status': 'Delivered',
-      'items': ['Aspirin 75mg x 90'],
-      'date': '2026-03-15T00:00:00Z',
-      'total': 12.99,
-      'cart': {'3': 1},
-    },
-  ];
+  @override
+  State<OrderHistoryScreen> createState() => _OrderHistoryScreenState();
+}
+
+class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
+  bool _isLoading = true;
+  String? _errorMessage;
+  List<Map<String, dynamic>> _orders = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOrders();
+  }
+
+  Future<void> _loadOrders() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final orders = await PatientApiService.getMedicationOrders(limit: 50);
+      if (!mounted) return;
+      setState(() {
+        _orders = orders;
+        _isLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = error.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  List<Map<String, dynamic>> _mapList(dynamic value) {
+    if (value is! List) return const [];
+    return value
+        .whereType<Map>()
+        .map((entry) => entry.map((k, v) => MapEntry(k.toString(), v)))
+        .toList();
+  }
+
+  String _text(dynamic value, [String fallback = '']) {
+    if (value == null) return fallback;
+    final text = value.toString().trim();
+    return text.isEmpty ? fallback : text;
+  }
+
+  double _toDouble(dynamic value, [double fallback = 0]) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '') ?? fallback;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,132 +81,183 @@ class OrderHistoryScreen extends StatelessWidget {
         elevation: 0,
         centerTitle: true,
       ),
-      body: ListView.separated(
-        padding: const EdgeInsets.all(16),
-        itemCount: _orders.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (context, index) {
-          final order = _orders[index];
-          final items = (order['items'] as List<dynamic>).cast<String>();
-          final status = order['status'] as String;
-          final isDelivered = status == 'Delivered';
-          final statusBg = isDelivered ? const Color(0xFFD5F2DE) : const Color(0xFFF7E4BE);
-          final statusText = isDelivered ? const Color(0xFF2E7D32) : AppColors.accent;
-
-          return Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.cream,
-              border: Border.all(color: AppColors.surface),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        order['id'] as String,
-                        style: const TextStyle(
-                          color: AppColors.brownLight,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: statusBg,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        status,
-                        style: TextStyle(
-                          color: statusText,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                ...items.map(
-                  (item) => Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Text(
-                      item,
-                      style: const TextStyle(
-                        color: AppColors.brownDeep,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        _formatDate(order['date'] as String),
-                        style: const TextStyle(
-                          color: AppColors.brownMid,
-                          fontSize: 12,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '\$${(order['total'] as double).toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        color: AppColors.brownDeep,
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      final cart = Map<String, int>.from(order['cart'] as Map);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => OrderMedicinesScreen(
-                            initialCart: cart,
-                            initialOrderId: order['id'] as String,
+      body: RefreshIndicator(
+        onRefresh: _loadOrders,
+        child: _isLoading
+            ? const Center(
+                child: CircularProgressIndicator(color: AppColors.accent),
+              )
+            : _errorMessage != null
+                ? ListView(
+                    children: [
+                      const SizedBox(height: 120),
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          child: Text(
+                            _errorMessage!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: AppColors.brownMid,
+                              fontSize: 13,
+                            ),
                           ),
                         ),
-                      );
-                    },
-                    icon: const Icon(Icons.refresh, size: 16),
-                    label: const Text('Reorder'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.brownDeep,
-                      foregroundColor: AppColors.cream,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
                       ),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
+                    ],
+                  )
+                : _orders.isEmpty
+                    ? ListView(
+                        children: const [
+                          SizedBox(height: 120),
+                          Center(
+                            child: Text(
+                              'No orders found yet.',
+                              style: TextStyle(
+                                color: AppColors.brownMid,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _orders.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        itemBuilder: (context, index) {
+                          final order = _orders[index];
+                          final items = _mapList(order['items']);
+                          final status = _text(order['status'], 'PLACED');
+                          final isDelivered = status == 'DELIVERED';
+                          final statusBg = isDelivered
+                              ? const Color(0xFFD5F2DE)
+                              : const Color(0xFFF7E4BE);
+                          final statusText =
+                              isDelivered ? const Color(0xFF2E7D32) : AppColors.accent;
+
+                          return Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: AppColors.cream,
+                              border: Border.all(color: AppColors.surface),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        _text(order['id']),
+                                        style: const TextStyle(
+                                          color: AppColors.brownLight,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: statusBg,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        status,
+                                        style: TextStyle(
+                                          color: statusText,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                if (items.isEmpty)
+                                  const Text(
+                                    'No items',
+                                    style: TextStyle(
+                                      color: AppColors.brownDeep,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ...items.map(
+                                  (item) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 4),
+                                    child: Text(
+                                      '${_text(item['name'], 'Medicine')} x${_text(item['quantity'], '1')}',
+                                      style: const TextStyle(
+                                        color: AppColors.brownDeep,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        _formatDate(_text(order['orderedAt'])),
+                                        style: const TextStyle(
+                                          color: AppColors.brownMid,
+                                          fontSize: 12,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      '\$${_toDouble(order['totalAmount']).toStringAsFixed(2)}',
+                                      style: const TextStyle(
+                                        color: AppColors.brownDeep,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton.icon(
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => OrderTrackingScreen(
+                                            orderId: _text(order['id']),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    icon: const Icon(Icons.local_shipping_outlined, size: 16),
+                                    label: const Text('Track Order'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.brownDeep,
+                                      foregroundColor: AppColors.cream,
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
       ),
     );
   }

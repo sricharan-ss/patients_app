@@ -197,6 +197,9 @@ class AuthService {
     final response = await _put('/api/patients/me/profile', {
       'age': age,
       'gender': gender,
+      if (email != null && email.trim().isNotEmpty) 'email': email.trim(),
+      if (emergencyContact != null && emergencyContact.trim().isNotEmpty)
+        'emergencyContact': emergencyContact.trim(),
       if (bloodGroup != null && bloodGroup.isNotEmpty) 'bloodGroup': bloodGroup,
       if (chronicConditions != null) 'chronicConditions': chronicConditions,
     }, bearerToken: accessToken);
