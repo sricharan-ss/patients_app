@@ -7,6 +7,7 @@ import '../screens/hospital_detail_screen.dart';
 import 'profile_screen.dart';
 import 'medications_screen.dart';
 import 'medical_history_screen.dart';
+import 'order_tracking_screen.dart';
 
 class MainAppScreen extends StatefulWidget {
   const MainAppScreen({super.key});
@@ -18,6 +19,7 @@ class MainAppScreen extends StatefulWidget {
 class _MainAppScreenState extends State<MainAppScreen> {
   int _selectedIndex = 0;
   bool _locationChecked = false;
+  int _homeRefreshSeed = 0;
 
   @override
   void initState() {
@@ -127,7 +129,10 @@ class _MainAppScreenState extends State<MainAppScreen> {
       body: IndexedStack(
         index: _selectedIndex,
         children: [
-          const _HomeTab(),
+          _HomeTab(
+            refreshSeed: _homeRefreshSeed,
+            onOpenMedications: () => setState(() => _selectedIndex = 1),
+          ),
           const MedicationsScreen(),
           const MedicalHistoryScreen(),
           const ProfileScreen(),
@@ -135,7 +140,10 @@ class _MainAppScreenState extends State<MainAppScreen> {
       ),
       bottomNavigationBar: _BottomNav(
         selectedIndex: _selectedIndex,
-        onTap: (i) => setState(() => _selectedIndex = i),
+        onTap: (i) => setState(() {
+          if (i == 0) _homeRefreshSeed++;
+          _selectedIndex = i;
+        }),
       ),
     );
   }
@@ -145,7 +153,13 @@ class _MainAppScreenState extends State<MainAppScreen> {
 // Home Tab
 // ─────────────────────────────────────────────────────────────
 class _HomeTab extends StatefulWidget {
-  const _HomeTab();
+  const _HomeTab({
+    required this.refreshSeed,
+    required this.onOpenMedications,
+  });
+
+  final int refreshSeed;
+  final VoidCallback onOpenMedications;
 
   @override
   State<_HomeTab> createState() => _HomeTabState();
@@ -156,11 +170,21 @@ class _HomeTabState extends State<_HomeTab> {
   String? _errorMessage;
   List<PatientAppointment> _appointments = <PatientAppointment>[];
   List<PatientHospital> _hospitals = <PatientHospital>[];
+  Map<String, dynamic> _medicationDashboard = const {};
+  List<Map<String, dynamic>> _recentOrders = const [];
 
   @override
   void initState() {
     super.initState();
     _loadHomeData();
+  }
+
+  @override
+  void didUpdateWidget(covariant _HomeTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshSeed != widget.refreshSeed) {
+      _loadHomeData();
+    }
   }
 
   Future<void> _loadHomeData() async {
@@ -174,21 +198,55 @@ class _HomeTabState extends State<_HomeTab> {
       final results = await Future.wait<dynamic>([
         PatientApiService.getAppointments(),
         PatientApiService.getHospitals(),
+        PatientApiService.getMedicationDashboard(),
+        PatientApiService.getMedicationOrders(limit: 1),
       ]);
 
       if (!mounted) return;
       setState(() {
         _appointments = results[0] as List<PatientAppointment>;
         _hospitals = results[1] as List<PatientHospital>;
+        _medicationDashboard = results[2] as Map<String, dynamic>;
+        _recentOrders = results[3] as List<Map<String, dynamic>>;
         _isLoading = false;
       });
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = error.toString();
+        _errorMessage = PatientApiService.friendlyError(error);
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _markHomeMedicationTaken(String scheduleId) async {
+    try {
+      await PatientApiService.markMedicationTaken(scheduleId);
+      await _loadHomeData();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Medication marked as taken')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(PatientApiService.friendlyError(error))),
+      );
+    }
+  }
+
+  List<Map<String, dynamic>> _mapList(dynamic value) {
+    if (value is! List) return const [];
+    return value
+        .whereType<Map>()
+        .map((entry) => entry.map((k, v) => MapEntry(k.toString(), v)))
+        .toList();
+  }
+
+  String _text(dynamic value, [String fallback = '']) {
+    if (value == null) return fallback;
+    final text = value.toString().trim();
+    return text.isEmpty ? fallback : text;
   }
 
   Color _statusColor(String status) {
@@ -232,6 +290,11 @@ class _HomeTabState extends State<_HomeTab> {
   Widget build(BuildContext context) {
     final previewAppointments = _appointments.take(2).toList();
     final previewHospitals = _hospitals.take(3).toList();
+    final schedule = _mapList(_medicationDashboard['todaySchedule'])
+        .where((item) => _text(item['status'], 'ACTIVE').toUpperCase() == 'ACTIVE')
+        .toList();
+    final nextMedication = schedule.isEmpty ? null : schedule.first;
+    final recentOrder = _recentOrders.isEmpty ? null : _recentOrders.first;
 
     return RefreshIndicator(
       onRefresh: _loadHomeData,
@@ -314,13 +377,34 @@ class _HomeTabState extends State<_HomeTab> {
               ),
             ),
             const SizedBox(height: 24),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Column(
                 children: [
-                  _MedicationCard(),
-                  SizedBox(height: 16),
-                  _RecentOrderCard(),
+                  _MedicationCard(
+                    schedule: nextMedication,
+                    onOpenMedications: widget.onOpenMedications,
+                    onMarkTaken: nextMedication == null
+                        ? null
+                        : () => _markHomeMedicationTaken(_text(nextMedication['id'])),
+                  ),
+                  const SizedBox(height: 16),
+                  _RecentOrderCard(
+                    order: recentOrder,
+                    onTap: recentOrder == null
+                        ? null
+                        : () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => OrderTrackingScreen(
+                                  orderId: _text(recentOrder['id']),
+                                ),
+                              ),
+                            );
+                            if (mounted) _loadHomeData();
+                          },
+                  ),
                 ],
               ),
             ),
@@ -965,10 +1049,41 @@ class _DoctorPreviewCard extends StatelessWidget {
 }
 
 class _MedicationCard extends StatelessWidget {
-  const _MedicationCard();
+  const _MedicationCard({
+    required this.schedule,
+    required this.onOpenMedications,
+    required this.onMarkTaken,
+  });
+
+  final Map<String, dynamic>? schedule;
+  final VoidCallback onOpenMedications;
+  final VoidCallback? onMarkTaken;
+
+  String _text(dynamic value, [String fallback = '']) {
+    if (value == null) return fallback;
+    final text = value.toString().trim();
+    return text.isEmpty ? fallback : text;
+  }
+
+  String _formatTime(String hhmm) {
+    final parts = hhmm.split(':');
+    if (parts.length < 2) return hhmm.isEmpty ? 'Time TBD' : hhmm;
+    final hour = int.tryParse(parts[0]) ?? 0;
+    final minute = int.tryParse(parts[1]) ?? 0;
+    final suffix = hour >= 12 ? 'PM' : 'AM';
+    final displayHour = hour % 12 == 0 ? 12 : hour % 12;
+    return '$displayHour:${minute.toString().padLeft(2, '0')} $suffix';
+  }
 
   @override
   Widget build(BuildContext context) {
+    final medicineName = schedule == null
+        ? 'No medication due'
+        : '${_text(schedule!['medicineName'], 'Medicine')} ${_text(schedule!['dosage'])}'.trim();
+    final timeText = schedule == null
+        ? 'Open medications to manage your schedule'
+        : _formatTime(_text(schedule!['timeOfDay']));
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -1006,27 +1121,31 @@ class _MedicationCard extends StatelessWidget {
                           child: const Icon(Icons.medication_outlined, color: AppColors.accent, size: 20),
                         ),
                         const SizedBox(width: 12),
-                        const Expanded(
+                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
+                              const Text(
                                 'Next medication',
                                 style: TextStyle(color: AppColors.brownMid, fontSize: 12, fontWeight: FontWeight.w500),
                               ),
                               Text(
-                                'Metformin 500mg',
-                                style: TextStyle(color: AppColors.brownDeep, fontSize: 16, fontWeight: FontWeight.w800),
+                                medicineName,
+                                style: const TextStyle(color: AppColors.brownDeep, fontSize: 16, fontWeight: FontWeight.w800),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                               Text(
-                                '2:00 PM',
-                                style: TextStyle(color: AppColors.brownMid, fontSize: 13, fontWeight: FontWeight.w500),
+                                timeText,
+                                style: const TextStyle(color: AppColors.brownMid, fontSize: 13, fontWeight: FontWeight.w500),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ],
                           ),
                         ),
                         ElevatedButton(
-                          onPressed: () {},
+                          onPressed: onMarkTaken,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.brownDeep,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -1040,9 +1159,12 @@ class _MedicationCard extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    const Text(
-                      'View all medications +',
-                      style: TextStyle(color: AppColors.accent, fontSize: 13, fontWeight: FontWeight.w600),
+                    GestureDetector(
+                      onTap: onOpenMedications,
+                      child: const Text(
+                        'View all medications +',
+                        style: TextStyle(color: AppColors.accent, fontSize: 13, fontWeight: FontWeight.w600),
+                      ),
                     ),
                   ],
                 ),
@@ -1059,45 +1181,82 @@ class _MedicationCard extends StatelessWidget {
 // Recent Order Card
 // ─────────────────────────────────────────────────────────────
 class _RecentOrderCard extends StatelessWidget {
-  const _RecentOrderCard();
+  const _RecentOrderCard({
+    required this.order,
+    required this.onTap,
+  });
+
+  final Map<String, dynamic>? order;
+  final VoidCallback? onTap;
+
+  String _text(dynamic value, [String fallback = '']) {
+    if (value == null) return fallback;
+    final text = value.toString().trim();
+    return text.isEmpty ? fallback : text;
+  }
+
+  List<Map<String, dynamic>> _mapList(dynamic value) {
+    if (value is! List) return const [];
+    return value
+        .whereType<Map>()
+        .map((entry) => entry.map((k, v) => MapEntry(k.toString(), v)))
+        .toList();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.all(16),
-      decoration: const BoxDecoration(
+    final items = _mapList(order?['items']);
+    final firstItem = items.isEmpty ? null : items.first;
+    final orderId = _text(order?['id'], 'No active order');
+    final itemText = order == null
+        ? 'Orders you place will appear here.'
+        : '${_text(firstItem?['name'], 'Medication order')} x${_text(firstItem?['quantity'], '1')}';
+    final status = _text(order?['status'], order == null ? 'No order' : 'PLACED');
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.all(Radius.circular(16)),
-        border: Border(top: BorderSide(color: AppColors.surface), left: BorderSide(color: AppColors.surface), right: BorderSide(color: AppColors.surface), bottom: BorderSide(color: AppColors.surface)),
+        borderRadius: const BorderRadius.all(Radius.circular(16)),
+        border: Border.all(color: AppColors.surface),
       ),
       child: Row(
         children: [
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
+                    const Text(
                       'Recent Order',
                       style: TextStyle(color: AppColors.brownDeep, fontSize: 15, fontWeight: FontWeight.w700),
                     ),
-                    Text(
-                      'ORD-001234',
-                      style: TextStyle(color: AppColors.accent, fontSize: 13, fontWeight: FontWeight.w600),
+                    Flexible(
+                      child: Text(
+                        orderId,
+                        style: const TextStyle(color: AppColors.accent, fontSize: 13, fontWeight: FontWeight.w600),
+                        textAlign: TextAlign.right,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ],
                 ),
-                SizedBox(height: 8),
+                const SizedBox(height: 8),
                 Text(
-                  'Metformin 500mg x 60',
-                  style: TextStyle(color: AppColors.brownDeep, fontSize: 14, fontWeight: FontWeight.w500),
+                  itemText,
+                  style: const TextStyle(color: AppColors.brownDeep, fontSize: 14, fontWeight: FontWeight.w500),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
-                  'Out for Delivery',
-                  style: TextStyle(color: AppColors.accent, fontSize: 13, fontWeight: FontWeight.w600),
+                  status,
+                  style: const TextStyle(color: AppColors.accent, fontSize: 13, fontWeight: FontWeight.w600),
                 ),
               ],
             ),
@@ -1105,6 +1264,7 @@ class _RecentOrderCard extends StatelessWidget {
           const SizedBox(width: 12),
           const Icon(Icons.chevron_right, color: AppColors.brownMid, size: 24),
         ],
+      ),
       ),
     );
   }

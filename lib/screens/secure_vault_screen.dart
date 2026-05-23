@@ -13,6 +13,7 @@ class SecureVaultScreen extends StatefulWidget {
 class _SecureVaultScreenState extends State<SecureVaultScreen> {
   final List<Map<String, String>> _files = [];
   bool _isLoading = true;
+  bool _isUploading = false;
   String? _errorMessage;
 
   @override
@@ -50,7 +51,7 @@ class _SecureVaultScreenState extends State<SecureVaultScreen> {
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = error.toString();
+        _errorMessage = PatientApiService.friendlyError(error);
         _isLoading = false;
       });
     }
@@ -62,37 +63,22 @@ class _SecureVaultScreenState extends State<SecureVaultScreen> {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+        withData: true,
       );
 
       if (result != null && result.files.single.name.isNotEmpty) {
         final file = result.files.single;
         final fileName = file.name;
-        final ext = fileName.split('.').last.toLowerCase();
-        final isPdf = ext == 'pdf';
+        final bytes = file.bytes;
+        final path = kIsWeb ? null : file.path;
 
-        String sizeStr;
-        if (kIsWeb) {
-          final sizeKb = file.size / 1024;
-          sizeStr = sizeKb >= 1024
-              ? '${(sizeKb / 1024).toStringAsFixed(1)} MB'
-              : '${sizeKb.toStringAsFixed(0)} KB';
-        } else {
-          // On mobile, size is also in bytes
-          final sizeKb = file.size / 1024;
-          sizeStr = sizeKb >= 1024
-              ? '${(sizeKb / 1024).toStringAsFixed(1)} MB'
-              : '${sizeKb.toStringAsFixed(0)} KB';
-        }
-
-        setState(() {
-          _files.insert(0, {
-            'id': DateTime.now().millisecondsSinceEpoch.toString(),
-            'name': fileName,
-            'type': isPdf ? 'pdf' : 'image',
-            'date': DateTime.now().toIso8601String(),
-            'size': sizeStr,
-          });
-        });
+        setState(() => _isUploading = true);
+        await PatientApiService.uploadVaultFile(
+          fileName: fileName,
+          filePath: path,
+          bytes: bytes,
+        );
+        await _loadVault();
 
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -107,10 +93,12 @@ class _SecureVaultScreenState extends State<SecureVaultScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error picking file: $e'),
+          content: Text(PatientApiService.friendlyError(e)),
           backgroundColor: Colors.red,
         ),
       );
+    } finally {
+      if (mounted) setState(() => _isUploading = false);
     }
   }
 
@@ -290,13 +278,22 @@ class _SecureVaultScreenState extends State<SecureVaultScreen> {
             bottom: 24,
             right: 24,
             child: FloatingActionButton(
-              onPressed: _addFile,
+              onPressed: _isUploading ? null : _addFile,
               backgroundColor: const Color(0xFF3B1F0A),
               elevation: 4,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(30),
               ),
-              child: const Icon(Icons.add, color: Color(0xFFFBF6EC), size: 28),
+              child: _isUploading
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Color(0xFFFBF6EC),
+                      ),
+                    )
+                  : const Icon(Icons.add, color: Color(0xFFFBF6EC), size: 28),
             ),
           ),
         ],

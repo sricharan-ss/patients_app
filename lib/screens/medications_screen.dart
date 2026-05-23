@@ -55,7 +55,7 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = error.toString();
+        _errorMessage = PatientApiService.friendlyError(error);
         _isLoading = false;
       });
     }
@@ -85,7 +85,7 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.toString())),
+        SnackBar(content: Text(PatientApiService.friendlyError(error))),
       );
     } finally {
       if (mounted) {
@@ -108,7 +108,7 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.toString())),
+        SnackBar(content: Text(PatientApiService.friendlyError(error))),
       );
     } finally {
       if (mounted) {
@@ -379,14 +379,17 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
                                 ),
                                 const SizedBox(height: 8),
                                 GestureDetector(
-                                  onTap: () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => RefillPageScreen(
-                                        initialItems: _refillAlerts,
+                                  onTap: () async {
+                                    await Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => RefillPageScreen(
+                                          initialItems: _refillAlerts,
+                                        ),
                                       ),
-                                    ),
-                                  ),
+                                    );
+                                    if (mounted) _loadMedicationDashboard();
+                                  },
                                   child: Text(
                                     'Refill Now ->',
                                     style: TextStyle(
@@ -410,10 +413,13 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const OrderMedicinesScreen()),
-                    ),
+                    onPressed: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const OrderMedicinesScreen()),
+                      );
+                      if (mounted) _loadMedicationDashboard();
+                    },
                     icon: const Icon(Icons.add, size: 20),
                     label: const Text('Order Medicines'),
                     style: ElevatedButton.styleFrom(
@@ -456,14 +462,17 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
                           : _text(order['orderedAt']);
 
                   return GestureDetector(
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => OrderTrackingScreen(
-                          orderId: _text(order['id']),
+                    onTap: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => OrderTrackingScreen(
+                            orderId: _text(order['id']),
+                          ),
                         ),
-                      ),
-                    ),
+                      );
+                      if (mounted) _loadMedicationDashboard();
+                    },
                     child: Container(
                       margin: const EdgeInsets.only(bottom: 8),
                       padding: const EdgeInsets.all(16),

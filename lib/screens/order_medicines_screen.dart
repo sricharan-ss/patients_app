@@ -64,7 +64,7 @@ class _OrderMedicinesScreenState extends State<OrderMedicinesScreen> {
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = error.toString();
+        _errorMessage = PatientApiService.friendlyError(error);
         _isLoading = false;
       });
     }
@@ -164,7 +164,7 @@ class _OrderMedicinesScreenState extends State<OrderMedicinesScreen> {
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.toString())),
+        SnackBar(content: Text(PatientApiService.friendlyError(error))),
       );
     } finally {
       if (mounted) setState(() => _isSubmitting = false);

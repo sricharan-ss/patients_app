@@ -48,6 +48,41 @@ class PatientApiService {
     return data.map(PatientDoctor.fromJson).toList();
   }
 
+  static Map<String, String> _authHeaders() {
+    final token = SessionStore.accessToken;
+    return {
+      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+    };
+  }
+
+  static String friendlyError(Object error) {
+    final message = error is PatientApiException ? error.message : error.toString();
+    final normalized = message.replaceFirst('Exception: ', '').trim();
+    final lower = normalized.toLowerCase();
+
+    if (lower.contains('unable to reach backend') ||
+        lower.contains('connection refused') ||
+        lower.contains('failed host lookup') ||
+        lower.contains('socket')) {
+      return 'Unable to reach VITADATA right now. Check your connection and try again.';
+    }
+    if (lower.contains('unauthorized') ||
+        lower.contains('token') ||
+        lower.contains('forbidden')) {
+      return 'Your session has expired. Please log in again.';
+    }
+    if (lower.contains('validation') ||
+        lower.contains('required') ||
+        lower.contains('invalid')) {
+      return normalized.isEmpty ? 'Please check the details and try again.' : normalized;
+    }
+    if (lower.contains('upload') || lower.contains('file')) {
+      return normalized.isEmpty ? 'Could not upload the file. Please try again.' : normalized;
+    }
+    if (normalized.isEmpty) return 'Something went wrong. Please try again.';
+    return normalized;
+  }
+
   static Future<Map<String, dynamic>> getDoctor(String doctorId) {
     return _getMap('/api/mobile/patient/doctors/$doctorId');
   }
@@ -207,6 +242,42 @@ class PatientApiService {
 
   static Future<Map<String, dynamic>> toggleFavoriteDoctor(String doctorId) {
     return _postMap('/api/mobile/patient/doctors/$doctorId/favorite', {});
+  }
+
+  static Future<void> uploadVaultFile({
+    required String fileName,
+    String? filePath,
+    List<int>? bytes,
+  }) async {
+    if ((filePath == null || filePath.isEmpty) && (bytes == null || bytes.isEmpty)) {
+      throw const PatientApiException('Please choose a valid file to upload.');
+    }
+
+    try {
+      final request = http.MultipartRequest('POST', _uri('/api/users/uploadVault'));
+      request.headers.addAll(_authHeaders());
+      if (bytes != null && bytes.isNotEmpty) {
+        request.files.add(http.MultipartFile.fromBytes('file', bytes, filename: fileName));
+      } else {
+        request.files.add(await http.MultipartFile.fromPath('file', filePath!, filename: fileName));
+      }
+
+      final streamed = await request.send();
+      final response = await http.Response.fromStream(streamed);
+      final decoded = response.body.isEmpty
+          ? <String, dynamic>{}
+          : jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw PatientApiException(
+          decoded['message']?.toString() ??
+              decoded['mesaage']?.toString() ??
+              'File upload failed with HTTP ${response.statusCode}',
+        );
+      }
+    } catch (error) {
+      if (error is PatientApiException) rethrow;
+      throw const PatientApiException('Could not upload the file. Please try again.');
+    }
   }
 
   static Future<List<dynamic>> _getList(

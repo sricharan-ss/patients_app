@@ -79,7 +79,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.toString())),
+        SnackBar(content: Text(PatientApiService.friendlyError(error))),
       );
     } finally {
       if (mounted) setState(() => _isFavoriteLoading = false);
