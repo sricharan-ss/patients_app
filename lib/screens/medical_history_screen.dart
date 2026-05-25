@@ -42,7 +42,7 @@ class _MedicalHistoryScreenState extends State<MedicalHistoryScreen> {
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = error.toString();
+        _errorMessage = PatientApiService.friendlyError(error);
         _isLoading = false;
       });
     }
@@ -341,7 +341,9 @@ class _HistoryRecordsPageState extends State<_HistoryRecordsPage> {
                   }
                   if (snapshot.hasError) {
                     return _HistoryMessage(
-                      message: snapshot.error.toString(),
+                      message: PatientApiService.friendlyError(
+                        snapshot.error ?? Exception('Unable to load records.'),
+                      ),
                       onRetry: () =>
                           setState(() => _recordsFuture = widget.loader()),
                     );

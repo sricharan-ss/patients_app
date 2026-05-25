@@ -38,7 +38,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = error.toString();
+        _errorMessage = PatientApiService.friendlyError(error);
         _isLoading = false;
       });
     }
@@ -91,17 +91,28 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                 ? ListView(
                     children: [
                       const SizedBox(height: 120),
-                      Center(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          child: Text(
-                            _errorMessage!,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: AppColors.brownMid,
-                              fontSize: 13,
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Column(
+                          children: [
+                            Text(
+                              _errorMessage!,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: AppColors.brownMid,
+                                fontSize: 13,
+                              ),
                             ),
-                          ),
+                            const SizedBox(height: 12),
+                            ElevatedButton(
+                              onPressed: _loadOrders,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.brownDeep,
+                                foregroundColor: AppColors.cream,
+                              ),
+                              child: const Text('Retry'),
+                            ),
+                          ],
                         ),
                       ),
                     ],

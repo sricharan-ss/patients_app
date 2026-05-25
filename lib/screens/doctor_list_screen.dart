@@ -62,7 +62,7 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = error.toString();
+        _errorMessage = PatientApiService.friendlyError(error);
         _isLoading = false;
       });
     }

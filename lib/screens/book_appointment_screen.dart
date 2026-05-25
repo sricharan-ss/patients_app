@@ -212,7 +212,7 @@ class _BookAppointmentScreenState extends State<BookAppointmentScreen> {
       if (!mounted) return;
       setState(() {
         _isBooking = false;
-        _bookingError = error.toString();
+        _bookingError = PatientApiService.friendlyError(error);
       });
     }
   }
