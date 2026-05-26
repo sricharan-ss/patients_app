@@ -54,7 +54,11 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
       if (orders.isEmpty) {
         orders = await PatientApiService.getMedicationOrders(limit: 5);
       }
-      await MedicationNotificationService.syncMedicationReminders(schedule);
+      try {
+        await MedicationNotificationService.syncMedicationReminders(schedule);
+      } catch (_) {
+        // Medication data should still render if local notification setup fails.
+      }
 
       if (!mounted) return;
       setState(() {
@@ -77,9 +81,10 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
     final lastTakenAt = DateTime.tryParse(schedule['lastTakenAt']?.toString() ?? '');
     if (lastTakenAt == null) return false;
     final now = DateTime.now();
-    return lastTakenAt.year == now.year &&
-        lastTakenAt.month == now.month &&
-        lastTakenAt.day == now.day;
+    final local = lastTakenAt.toLocal();
+    return local.year == now.year &&
+        local.month == now.month &&
+        local.day == now.day;
   }
 
   Future<void> _markTaken(Map<String, dynamic> schedule) async {

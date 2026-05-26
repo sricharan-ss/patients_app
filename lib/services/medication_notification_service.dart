@@ -22,7 +22,7 @@ class MedicationNotificationService {
     if (_initialized) return;
 
     tz.initializeTimeZones();
-    tz.setLocalLocation(tz.local);
+    tz.setLocalLocation(tz.getLocation('Asia/Kolkata'));
 
     const androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -62,13 +62,15 @@ class MedicationNotificationService {
     for (final schedule in schedules) {
       final status = _text(schedule['status'], 'ACTIVE').toUpperCase();
       if (status != 'ACTIVE') continue;
-      if (_isTakenToday(schedule)) continue;
 
       final id = _text(schedule['id']);
       final timeOfDay = _text(schedule['timeOfDay']);
       if (id.isEmpty || timeOfDay.isEmpty) continue;
 
-      final due = _nextDueTime(timeOfDay);
+      final due = _nextDueTime(
+        timeOfDay,
+        forceTomorrow: _isTakenToday(schedule),
+      );
       await _plugin.zonedSchedule(
         _notificationId(id),
         'Medicine reminder',
