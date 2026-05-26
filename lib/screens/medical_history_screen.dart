@@ -1,4 +1,5 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../core/app_colors.dart';
 import '../services/patient_api_service.dart';
@@ -77,7 +78,8 @@ class _MedicalHistoryScreenState extends State<MedicalHistoryScreen> {
                     ),
                     const Spacer(),
                     IconButton(
-                      onPressed: () => Navigator.pushNamed(context, '/settings'),
+                      onPressed: () =>
+                          Navigator.pushNamed(context, '/settings'),
                       icon: const Icon(
                         Icons.settings_outlined,
                         color: AppColors.brownDeep,
@@ -166,12 +168,10 @@ class PrescriptionsScreen extends StatelessWidget {
         final records = await PatientApiService.getRecords();
         return records.prescriptions.map((item) {
           final encounter = item['encounter'];
-          final doctor = encounter is Map<String, dynamic>
-              ? encounter['doctor']
-              : null;
-          final hospital = encounter is Map<String, dynamic>
-              ? encounter['hospital']
-              : null;
+          final doctor =
+              encounter is Map<String, dynamic> ? encounter['doctor'] : null;
+          final hospital =
+              encounter is Map<String, dynamic> ? encounter['hospital'] : null;
           return _HistoryRecord(
             primary: _nestedString(doctor, 'name', 'Prescription'),
             secondary:
@@ -201,13 +201,11 @@ class LabReportsScreen extends StatelessWidget {
         final records = await PatientApiService.getRecords();
         return records.labReports.map((item) {
           final encounter = item['encounter'];
-          final hospital = encounter is Map<String, dynamic>
-              ? encounter['hospital']
-              : null;
+          final hospital =
+              encounter is Map<String, dynamic> ? encounter['hospital'] : null;
           return _HistoryRecord(
             primary: item['testName']?.toString() ?? 'Lab report',
-            secondary:
-                item['remarks']?.toString() ??
+            secondary: item['remarks']?.toString() ??
                 item['resultValue']?.toString() ??
                 'Uploaded',
             source: _nestedString(hospital, 'name', 'VITADATA Lab'),
@@ -352,12 +350,11 @@ class _HistoryRecordsPageState extends State<_HistoryRecordsPage> {
                   final normalized = _query.trim().toLowerCase();
                   final filtered = (snapshot.data ?? const <_HistoryRecord>[])
                       .where((record) {
-                        final text =
-                            '${record.primary} ${record.secondary} ${record.source}'
-                                .toLowerCase();
-                        return text.contains(normalized);
-                      })
-                      .toList();
+                    final text =
+                        '${record.primary} ${record.secondary} ${record.source}'
+                            .toLowerCase();
+                    return text.contains(normalized);
+                  }).toList();
 
                   if (filtered.isEmpty) {
                     return const _HistoryMessage(
@@ -432,9 +429,8 @@ String _nestedString(dynamic value, String key, String fallback) {
 }
 
 String _formatDate(dynamic value) {
-  final date = value is DateTime
-      ? value
-      : DateTime.tryParse(value?.toString() ?? '');
+  final date =
+      value is DateTime ? value : DateTime.tryParse(value?.toString() ?? '');
   if (date == null) return 'Date not available';
   const months = [
     'Jan',
@@ -532,6 +528,52 @@ class _HistoryRecordCard extends StatelessWidget {
 
   final _HistoryRecord record;
 
+  Future<void> _showPdfLink(BuildContext context) async {
+    final pdfUrl = (record.pdfUrl ?? '').trim();
+    if (pdfUrl.isEmpty) return;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.warmWhite,
+        title: Text(
+          record.primary,
+          style: const TextStyle(
+            color: AppColors.brownDeep,
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        content: SelectableText(
+          pdfUrl,
+          style: const TextStyle(color: AppColors.brownMid, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Close'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: pdfUrl));
+              if (!context.mounted) return;
+              Navigator.pop(dialogContext);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('PDF link copied')),
+              );
+            },
+            icon: const Icon(Icons.copy, size: 16),
+            label: const Text('Copy Link'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.brownDeep,
+              foregroundColor: AppColors.cream,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final hasPdf = (record.pdfUrl ?? '').trim().isNotEmpty;
@@ -562,12 +604,10 @@ class _HistoryRecordCard extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               IconButton(
-                onPressed: () {},
-                icon: const Icon(
-                  Icons.file_download_outlined,
-                  color: AppColors.accent,
-                  size: 20,
-                ),
+                onPressed: hasPdf ? () => _showPdfLink(context) : null,
+                icon: const Icon(Icons.file_download_outlined, size: 20),
+                color: AppColors.accent,
+                disabledColor: AppColors.brownLight,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
                 splashRadius: 20,
@@ -603,9 +643,9 @@ class _HistoryRecordCard extends StatelessWidget {
                 ),
               ),
               GestureDetector(
-                onTap: hasPdf ? () {} : null,
+                onTap: hasPdf ? () => _showPdfLink(context) : null,
                 child: Text(
-                  hasPdf ? 'View PDF +' : 'PDF not uploaded',
+                  hasPdf ? 'PDF link +' : 'PDF not uploaded',
                   style: TextStyle(
                     color: hasPdf ? AppColors.accent : AppColors.brownLight,
                     fontSize: 13,
@@ -636,6 +676,3 @@ class _HistoryRecord {
   final String date;
   final String? pdfUrl;
 }
-
-
-

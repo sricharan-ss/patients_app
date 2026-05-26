@@ -3,6 +3,7 @@ import 'package:geolocator/geolocator.dart';
 import '../core/app_colors.dart';
 import '../core/session_store.dart';
 import '../services/patient_api_service.dart';
+import '../screens/doctor_profile_screen.dart';
 import '../screens/hospital_detail_screen.dart';
 import 'profile_screen.dart';
 import 'medications_screen.dart';
@@ -43,7 +44,8 @@ class _MainAppScreenState extends State<MainAppScreen> {
         barrierDismissible: false,
         builder: (ctx) => Dialog(
           backgroundColor: AppColors.warmWhite,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Column(
@@ -56,7 +58,8 @@ class _MainAppScreenState extends State<MainAppScreen> {
                     color: Color(0xFFE8F5E9),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.location_on, color: Color(0xFF2E7D32), size: 32),
+                  child: const Icon(Icons.location_on,
+                      color: Color(0xFF2E7D32), size: 32),
                 ),
                 const SizedBox(height: 18),
                 const Text(
@@ -86,7 +89,8 @@ class _MainAppScreenState extends State<MainAppScreen> {
                     onPressed: () => Navigator.pop(ctx, true),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.brownDeep,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
                     ),
                     child: const Text(
                       'Allow Location',
@@ -170,6 +174,7 @@ class _HomeTabState extends State<_HomeTab> {
   String? _errorMessage;
   List<PatientAppointment> _appointments = <PatientAppointment>[];
   List<PatientHospital> _hospitals = <PatientHospital>[];
+  List<PatientDoctor> _doctors = <PatientDoctor>[];
   Map<String, dynamic> _medicationDashboard = const {};
   List<Map<String, dynamic>> _recentOrders = const [];
 
@@ -198,6 +203,7 @@ class _HomeTabState extends State<_HomeTab> {
       final results = await Future.wait<dynamic>([
         PatientApiService.getAppointments(),
         PatientApiService.getHospitals(),
+        PatientApiService.getDoctors(),
         PatientApiService.getMedicationDashboard(),
         PatientApiService.getMedicationOrders(limit: 1),
       ]);
@@ -206,8 +212,9 @@ class _HomeTabState extends State<_HomeTab> {
       setState(() {
         _appointments = results[0] as List<PatientAppointment>;
         _hospitals = results[1] as List<PatientHospital>;
-        _medicationDashboard = results[2] as Map<String, dynamic>;
-        _recentOrders = results[3] as List<Map<String, dynamic>>;
+        _doctors = results[2] as List<PatientDoctor>;
+        _medicationDashboard = results[3] as Map<String, dynamic>;
+        _recentOrders = results[4] as List<Map<String, dynamic>>;
         _isLoading = false;
       });
     } catch (error) {
@@ -286,15 +293,25 @@ class _HomeTabState extends State<_HomeTab> {
     return '$displayHour:${minute.toString().padLeft(2, '0')} $meridiem';
   }
 
+  PatientDoctor? get _recommendedDoctor {
+    if (_doctors.isEmpty) return null;
+    final availableDoctors = _doctors.where((doctor) => doctor.isAvailable);
+    return availableDoctors.isNotEmpty
+        ? availableDoctors.first
+        : _doctors.first;
+  }
+
   @override
   Widget build(BuildContext context) {
     final previewAppointments = _appointments.take(2).toList();
     final previewHospitals = _hospitals.take(3).toList();
     final schedule = _mapList(_medicationDashboard['todaySchedule'])
-        .where((item) => _text(item['status'], 'ACTIVE').toUpperCase() == 'ACTIVE')
+        .where(
+            (item) => _text(item['status'], 'ACTIVE').toUpperCase() == 'ACTIVE')
         .toList();
     final nextMedication = schedule.isEmpty ? null : schedule.first;
     final recentOrder = _recentOrders.isEmpty ? null : _recentOrders.first;
+    final recommendedDoctor = _recommendedDoctor;
 
     return RefreshIndicator(
       onRefresh: _loadHomeData,
@@ -311,17 +328,20 @@ class _HomeTabState extends State<_HomeTab> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const _SectionHeader(title: 'Your Appointments', onSeeAll: null),
+                  const _SectionHeader(
+                      title: 'Your Appointments', onSeeAll: null),
                   const SizedBox(height: 12),
                   if (_isLoading)
                     const Center(
                       child: Padding(
                         padding: EdgeInsets.symmetric(vertical: 16),
-                        child: CircularProgressIndicator(color: AppColors.accent),
+                        child:
+                            CircularProgressIndicator(color: AppColors.accent),
                       ),
                     )
                   else if (_errorMessage != null)
-                    _HomeInlineError(message: _errorMessage!, onRetry: _loadHomeData)
+                    _HomeInlineError(
+                        message: _errorMessage!, onRetry: _loadHomeData)
                   else if (previewAppointments.isEmpty)
                     const _NoAppointmentCard()
                   else
@@ -330,8 +350,8 @@ class _HomeTabState extends State<_HomeTab> {
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 12),
                           child: _AppointmentCard(
-                            doctorName:
-                                appointment.doctor?.name ?? 'Doctor appointment',
+                            doctorName: appointment.doctor?.name ??
+                                'Doctor appointment',
                             specialty: appointment.doctor?.specialty ??
                                 'General Practice',
                             hospital: appointment.hospital?.name ??
@@ -348,7 +368,8 @@ class _HomeTabState extends State<_HomeTab> {
                   const SizedBox(height: 24),
                   _SectionHeader(
                     title: 'Hospitals on VITADATA',
-                    onSeeAll: () => Navigator.pushNamed(context, '/hospital-list'),
+                    onSeeAll: () =>
+                        Navigator.pushNamed(context, '/hospital-list'),
                   ),
                   const SizedBox(height: 12),
                 ],
@@ -367,13 +388,35 @@ class _HomeTabState extends State<_HomeTab> {
               ),
             ),
             const SizedBox(height: 10),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: _DoctorPreviewCard(
-                name: 'Dr. Nova Reed',
-                specialty: 'Preventive Medicine',
-                hospital: 'VITADATA AI Assistant',
-                aiPick: true,
+                name: recommendedDoctor?.name ?? 'No recommendation yet',
+                specialty: recommendedDoctor?.specialty ??
+                    'Book an appointment to unlock personalized picks',
+                hospital: recommendedDoctor?.hospitalName ??
+                    'VITADATA will suggest doctors from your care network',
+                aiPick: recommendedDoctor != null,
+                onTap: recommendedDoctor == null
+                    ? null
+                    : () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => DoctorProfileScreen(
+                              id: recommendedDoctor.id,
+                              hospitalId: recommendedDoctor.hospitalId,
+                              name: recommendedDoctor.name,
+                              specialty: recommendedDoctor.specialty,
+                              hospital: recommendedDoctor.hospitalName,
+                              experience: recommendedDoctor.experience,
+                              totalPatients: recommendedDoctor.totalPatients,
+                              fee: recommendedDoctor.fee,
+                              aiRecommended: true,
+                            ),
+                          ),
+                        );
+                      },
               ),
             ),
             const SizedBox(height: 24),
@@ -386,7 +429,8 @@ class _HomeTabState extends State<_HomeTab> {
                     onOpenMedications: widget.onOpenMedications,
                     onMarkTaken: nextMedication == null
                         ? null
-                        : () => _markHomeMedicationTaken(_text(nextMedication['id'])),
+                        : () => _markHomeMedicationTaken(
+                            _text(nextMedication['id'])),
                   ),
                   const SizedBox(height: 16),
                   _RecentOrderCard(
@@ -449,7 +493,8 @@ class _HomeHeader extends StatelessWidget {
               // Top row: logo + title + settings
               Row(
                 children: [
-                  Image.asset('assets/images/onlyicon.png', height: 32, width: 32, fit: BoxFit.contain),
+                  Image.asset('assets/images/onlyicon.png',
+                      height: 32, width: 32, fit: BoxFit.contain),
                   const SizedBox(width: 8),
                   const Text(
                     'VITADATA',
@@ -466,7 +511,8 @@ class _HomeHeader extends StatelessWidget {
                     onTap: () => Navigator.pushNamed(context, '/notifications'),
                     child: const Padding(
                       padding: EdgeInsets.all(4),
-                      child: Icon(Icons.notifications_none, color: AppColors.cream, size: 26),
+                      child: Icon(Icons.notifications_none,
+                          color: AppColors.cream, size: 26),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -475,7 +521,8 @@ class _HomeHeader extends StatelessWidget {
                     onTap: () => Navigator.pushNamed(context, '/settings'),
                     child: const Padding(
                       padding: EdgeInsets.all(4),
-                      child: Icon(Icons.settings_outlined, color: AppColors.cream, size: 26),
+                      child: Icon(Icons.settings_outlined,
+                          color: AppColors.cream, size: 26),
                     ),
                   ),
                 ],
@@ -500,7 +547,7 @@ class _HomeHeader extends StatelessWidget {
                         const SizedBox(height: 2),
                         Text(
                           fullName,
-                          style: TextStyle(
+                          style: const TextStyle(
                             color: AppColors.warmWhite,
                             fontSize: 24,
                             fontWeight: FontWeight.w800,
@@ -524,7 +571,7 @@ class _HomeHeader extends StatelessWidget {
                       alignment: Alignment.center,
                       child: Text(
                         profileInitial,
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 20,
                           fontWeight: FontWeight.w700,
@@ -547,7 +594,8 @@ class _HomeHeader extends StatelessWidget {
                     child: TextField(
                       decoration: InputDecoration(
                         hintText: 'Search doctors, hospitals...',
-                        hintStyle: TextStyle(color: Colors.black38, fontSize: 15),
+                        hintStyle:
+                            TextStyle(color: Colors.black38, fontSize: 15),
                         prefixIcon: Icon(Icons.search, color: Colors.black38),
                         border: InputBorder.none,
                         contentPadding: EdgeInsets.symmetric(vertical: 14),
@@ -651,7 +699,8 @@ class _AppointmentCard extends StatelessWidget {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: statusColor.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(6),
@@ -680,20 +729,32 @@ class _AppointmentCard extends StatelessWidget {
           const SizedBox(height: 12),
           Row(
             children: [
-              Icon(Icons.calendar_today_outlined, color: AppColors.cream.withOpacity(0.8), size: 14),
+              Icon(Icons.calendar_today_outlined,
+                  color: AppColors.cream.withOpacity(0.8), size: 14),
               const SizedBox(width: 6),
               Text(
                 date,
-                style: TextStyle(color: AppColors.cream.withOpacity(0.9), fontSize: 14, fontWeight: FontWeight.w500),
+                style: TextStyle(
+                    color: AppColors.cream.withOpacity(0.9),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500),
               ),
               const SizedBox(width: 12),
-              Container(width: 4, height: 4, decoration: const BoxDecoration(color: AppColors.accent, shape: BoxShape.circle)),
+              Container(
+                  width: 4,
+                  height: 4,
+                  decoration: const BoxDecoration(
+                      color: AppColors.accent, shape: BoxShape.circle)),
               const SizedBox(width: 12),
-              Icon(Icons.access_time_outlined, color: AppColors.cream.withOpacity(0.8), size: 14),
+              Icon(Icons.access_time_outlined,
+                  color: AppColors.cream.withOpacity(0.8), size: 14),
               const SizedBox(width: 6),
               Text(
                 time,
-                style: TextStyle(color: AppColors.cream.withOpacity(0.9), fontSize: 14, fontWeight: FontWeight.w500),
+                style: TextStyle(
+                    color: AppColors.cream.withOpacity(0.9),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500),
               ),
             ],
           ),
@@ -913,12 +974,14 @@ class _HospitalCard extends StatelessWidget {
           const SizedBox(height: 8),
           Row(
             children: [
-              const Icon(Icons.location_on_outlined, color: AppColors.brownMid, size: 12),
+              const Icon(Icons.location_on_outlined,
+                  color: AppColors.brownMid, size: 12),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
                   '$location • $distance',
-                  style: const TextStyle(color: AppColors.brownMid, fontSize: 11),
+                  style:
+                      const TextStyle(color: AppColors.brownMid, fontSize: 11),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -930,8 +993,11 @@ class _HospitalCard extends StatelessWidget {
               const Icon(Icons.star, color: AppColors.accent, size: 12),
               const SizedBox(width: 4),
               Text(
-                rating, 
-                style: const TextStyle(color: AppColors.brownDeep, fontSize: 11, fontWeight: FontWeight.w600),
+                rating,
+                style: const TextStyle(
+                    color: AppColors.brownDeep,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600),
               ),
             ],
           ),
@@ -939,17 +1005,24 @@ class _HospitalCard extends StatelessWidget {
           Wrap(
             spacing: 4,
             runSpacing: 4,
-            children: tags.take(2).map((tag) => Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                tag,
-                style: const TextStyle(color: AppColors.brownMid, fontSize: 9, fontWeight: FontWeight.w500),
-              ),
-            )).toList(),
+            children: tags
+                .take(2)
+                .map((tag) => Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        tag,
+                        style: const TextStyle(
+                            color: AppColors.brownMid,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w500),
+                      ),
+                    ))
+                .toList(),
           ),
         ],
       ),
@@ -966,83 +1039,93 @@ class _DoctorPreviewCard extends StatelessWidget {
     required this.specialty,
     required this.hospital,
     required this.aiPick,
+    required this.onTap,
   });
 
   final String name;
   final String specialty;
   final String hospital;
   final bool aiPick;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.surface),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: const BoxDecoration(
-              color: AppColors.accent,
-              shape: BoxShape.circle,
-            ),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.surface),
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: const TextStyle(
-                    color: AppColors.brownDeep,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  specialty,
-                  style: const TextStyle(
-                    color: AppColors.brownMid,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  hospital,
-                  style: const TextStyle(
-                    color: AppColors.brownLight,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (aiPick)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF1E7FF),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: const Text(
-                'AI Pick',
-                style: TextStyle(
-                  color: Color(0xFF8F3AF8),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
+          child: Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: const BoxDecoration(
+                  color: AppColors.accent,
+                  shape: BoxShape.circle,
                 ),
               ),
-            ),
-        ],
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        color: AppColors.brownDeep,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      specialty,
+                      style: const TextStyle(
+                        color: AppColors.brownMid,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      hospital,
+                      style: const TextStyle(
+                        color: AppColors.brownLight,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (aiPick)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1E7FF),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Text(
+                    'AI Pick',
+                    style: TextStyle(
+                      color: Color(0xFF8F3AF8),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1079,7 +1162,8 @@ class _MedicationCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final medicineName = schedule == null
         ? 'No medication due'
-        : '${_text(schedule!['medicineName'], 'Medicine')} ${_text(schedule!['dosage'])}'.trim();
+        : '${_text(schedule!['medicineName'], 'Medicine')} ${_text(schedule!['dosage'])}'
+            .trim();
     final timeText = schedule == null
         ? 'Open medications to manage your schedule'
         : _formatTime(_text(schedule!['timeOfDay']));
@@ -1118,7 +1202,8 @@ class _MedicationCard extends StatelessWidget {
                             color: AppColors.accent.withOpacity(0.12),
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.medication_outlined, color: AppColors.accent, size: 20),
+                          child: const Icon(Icons.medication_outlined,
+                              color: AppColors.accent, size: 20),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -1127,17 +1212,26 @@ class _MedicationCard extends StatelessWidget {
                             children: [
                               const Text(
                                 'Next medication',
-                                style: TextStyle(color: AppColors.brownMid, fontSize: 12, fontWeight: FontWeight.w500),
+                                style: TextStyle(
+                                    color: AppColors.brownMid,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500),
                               ),
                               Text(
                                 medicineName,
-                                style: const TextStyle(color: AppColors.brownDeep, fontSize: 16, fontWeight: FontWeight.w800),
+                                style: const TextStyle(
+                                    color: AppColors.brownDeep,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
                               Text(
                                 timeText,
-                                style: const TextStyle(color: AppColors.brownMid, fontSize: 13, fontWeight: FontWeight.w500),
+                                style: const TextStyle(
+                                    color: AppColors.brownMid,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -1148,12 +1242,17 @@ class _MedicationCard extends StatelessWidget {
                           onPressed: onMarkTaken,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.brownDeep,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20)),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 10),
                           ),
                           child: const Text(
                             'Mark Taken',
-                            style: TextStyle(color: AppColors.warmWhite, fontSize: 13, fontWeight: FontWeight.w700),
+                            style: TextStyle(
+                                color: AppColors.warmWhite,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700),
                           ),
                         ),
                       ],
@@ -1163,7 +1262,10 @@ class _MedicationCard extends StatelessWidget {
                       onTap: onOpenMedications,
                       child: const Text(
                         'View all medications +',
-                        style: TextStyle(color: AppColors.accent, fontSize: 13, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                            color: AppColors.accent,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600),
                       ),
                     ),
                   ],
@@ -1211,60 +1313,74 @@ class _RecentOrderCard extends StatelessWidget {
     final itemText = order == null
         ? 'Orders you place will appear here.'
         : '${_text(firstItem?['name'], 'Medication order')} x${_text(firstItem?['quantity'], '1')}';
-    final status = _text(order?['status'], order == null ? 'No order' : 'PLACED');
+    final status =
+        _text(order?['status'], order == null ? 'No order' : 'PLACED');
 
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: const BorderRadius.all(Radius.circular(16)),
-        border: Border.all(color: AppColors.surface),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Recent Order',
-                      style: TextStyle(color: AppColors.brownDeep, fontSize: 15, fontWeight: FontWeight.w700),
-                    ),
-                    Flexible(
-                      child: Text(
-                        orderId,
-                        style: const TextStyle(color: AppColors.accent, fontSize: 13, fontWeight: FontWeight.w600),
-                        textAlign: TextAlign.right,
-                        overflow: TextOverflow.ellipsis,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: const BorderRadius.all(Radius.circular(16)),
+          border: Border.all(color: AppColors.surface),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Recent Order',
+                        style: TextStyle(
+                            color: AppColors.brownDeep,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  itemText,
-                  style: const TextStyle(color: AppColors.brownDeep, fontSize: 14, fontWeight: FontWeight.w500),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  status,
-                  style: const TextStyle(color: AppColors.accent, fontSize: 13, fontWeight: FontWeight.w600),
-                ),
-              ],
+                      Flexible(
+                        child: Text(
+                          orderId,
+                          style: const TextStyle(
+                              color: AppColors.accent,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600),
+                          textAlign: TextAlign.right,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    itemText,
+                    style: const TextStyle(
+                        color: AppColors.brownDeep,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    status,
+                    style: const TextStyle(
+                        color: AppColors.accent,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
-          const Icon(Icons.chevron_right, color: AppColors.brownMid, size: 24),
-        ],
-      ),
+            const SizedBox(width: 12),
+            const Icon(Icons.chevron_right,
+                color: AppColors.brownMid, size: 24),
+          ],
+        ),
       ),
     );
   }
@@ -1284,8 +1400,14 @@ class _BottomNav extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 12, offset: const Offset(0, -4))],
+        borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(20), topRight: Radius.circular(20)),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 12,
+              offset: const Offset(0, -4))
+        ],
       ),
       child: SafeArea(
         top: false,
@@ -1331,4 +1453,3 @@ class _BottomNav extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────
 // Placeholder Tabs
 // ─────────────────────────────────────────────────────────────
-

@@ -1,65 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+
 import '../core/app_colors.dart';
+import '../services/patient_api_service.dart';
+import 'doctor_profile_screen.dart';
 import 'hospital_detail_screen.dart';
-
-// ─── Mock data (mirrors other screens) ──────────────────────────────────────
-
-const _hospitals = [
-  (
-    name: 'City General Hospital',
-    location: 'New York',
-    distance: '2.3 km',
-    tags: ['Cardiology', 'Orthopedics', 'Neurology'],
-  ),
-  (
-    name: 'Metro Health Center',
-    location: 'New York',
-    distance: '3.1 km',
-    tags: ['Endocrinology', 'Pediatrics', 'Dermatology'],
-  ),
-  (
-    name: 'Sunrise Medical',
-    location: 'New York',
-    distance: '4.5 km',
-    tags: ['General Medicine', 'Surgery', 'Radiology'],
-  ),
-  (
-    name: 'Wellness Clinic',
-    location: 'New York',
-    distance: '5.2 km',
-    tags: ['Family Medicine', 'Psychiatry'],
-  ),
-];
-
-const _doctors = [
-  (
-    name: 'Dr. Emily Martinez',
-    specialty: 'Cardiologist',
-    hospital: 'City General Hospital',
-  ),
-  (
-    name: 'Dr. Sarah Chen',
-    specialty: 'General Physician',
-    hospital: 'Sunrise Medical',
-  ),
-  (
-    name: 'Dr. Michael Brown',
-    specialty: 'Orthopedist',
-    hospital: 'Metro Health Center',
-  ),
-  (
-    name: 'Dr. Aisha Khan',
-    specialty: 'Dermatologist',
-    hospital: 'Wellness Clinic',
-  ),
-  (
-    name: 'Dr. Rajesh Nair',
-    specialty: 'Neurologist',
-    hospital: 'City General Hospital',
-  ),
-];
-
-// ─── Screen ─────────────────────────────────────────────────────────────────
 
 class SearchResultsScreen extends StatefulWidget {
   const SearchResultsScreen({super.key});
@@ -71,67 +17,120 @@ class SearchResultsScreen extends StatefulWidget {
 class _SearchResultsScreenState extends State<SearchResultsScreen> {
   final TextEditingController _controller = TextEditingController();
   final FocusNode _focusNode = FocusNode();
+  final List<String> _recentSearches = [
+    'Cardiology',
+    'General Medicine',
+    'Hospitals'
+  ];
 
-  String _activeTab = 'all'; // all | doctors | hospitals
-  List<String> _recentSearches = ['Dr. Sarah', 'Cardiology', 'City General Hospital'];
+  Timer? _debounce;
+  String _activeTab = 'all';
+  bool _isLoading = false;
+  String? _errorMessage;
+  List<PatientDoctor> _doctors = const [];
+  List<PatientHospital> _hospitals = const [];
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _focusNode.requestFocus();
-    });
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _focusNode.requestFocus());
   }
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
   }
 
-  String get _query => _controller.text.trim().toLowerCase();
+  String get _query => _controller.text.trim();
 
-  List<dynamic> get _filteredDoctors {
-    if (_query.isEmpty) return [];
-    return _doctors.where((d) {
-      return d.name.toLowerCase().contains(_query) ||
-          d.specialty.toLowerCase().contains(_query) ||
-          d.hospital.toLowerCase().contains(_query);
+  List<PatientHospital> get _filteredHospitals {
+    final query = _query.toLowerCase();
+    if (query.isEmpty) return const [];
+    return _hospitals.where((hospital) {
+      return hospital.name.toLowerCase().contains(query) ||
+          hospital.city.toLowerCase().contains(query) ||
+          hospital.address.toLowerCase().contains(query) ||
+          hospital.tags.any((tag) => tag.toLowerCase().contains(query));
     }).toList();
   }
 
-  List<dynamic> get _filteredHospitals {
-    if (_query.isEmpty) return [];
-    return _hospitals.where((h) {
-      return h.name.toLowerCase().contains(_query) ||
-          h.location.toLowerCase().contains(_query) ||
-          h.tags.any((t) => t.toLowerCase().contains(_query));
-    }).toList();
+  bool get _hasResults => _doctors.isNotEmpty || _filteredHospitals.isNotEmpty;
+
+  void _onSearchChanged(String _) {
+    setState(() {});
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), _loadResults);
   }
 
-  bool get _hasResults => _filteredDoctors.isNotEmpty || _filteredHospitals.isNotEmpty;
+  Future<void> _loadResults() async {
+    final query = _query;
+    if (query.isEmpty) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = null;
+        _doctors = const [];
+        _hospitals = const [];
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final results = await Future.wait([
+        PatientApiService.getDoctors(query: query),
+        PatientApiService.getHospitals(),
+      ]);
+      if (!mounted || query != _query) return;
+      setState(() {
+        _doctors = results[0] as List<PatientDoctor>;
+        _hospitals = results[1] as List<PatientHospital>;
+        _isLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = PatientApiService.friendlyError(error);
+        _isLoading = false;
+      });
+    }
+  }
 
   void _clearSearch() {
     _controller.clear();
-    setState(() {});
+    _debounce?.cancel();
+    setState(() {
+      _doctors = const [];
+      _hospitals = const [];
+      _errorMessage = null;
+      _isLoading = false;
+    });
     _focusNode.requestFocus();
   }
 
-  void _removeRecent(String s) {
-    setState(() => _recentSearches.remove(s));
+  void _setQuery(String value) {
+    _controller.text = value;
+    _controller.selection =
+        TextSelection.fromPosition(TextPosition(offset: value.length));
+    _loadResults();
   }
 
-  void _clearAllRecent() {
-    setState(() => _recentSearches.clear());
-  }
-
-  void _setQuery(String q) {
-    _controller.text = q;
-    _controller.selection = TextSelection.fromPosition(
-      TextPosition(offset: q.length),
-    );
-    setState(() {});
+  void _rememberSearch() {
+    final query = _query;
+    if (query.isEmpty) return;
+    setState(() {
+      _recentSearches
+          .removeWhere((item) => item.toLowerCase() == query.toLowerCase());
+      _recentSearches.insert(0, query);
+      if (_recentSearches.length > 6) _recentSearches.removeLast();
+    });
   }
 
   @override
@@ -149,8 +148,6 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
     );
   }
 
-  // ── Brown search header ─────────────────────────────────────────────────
-
   Widget _buildHeader() {
     return Container(
       decoration: const BoxDecoration(
@@ -166,7 +163,6 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
           padding: const EdgeInsets.fromLTRB(12, 8, 16, 14),
           child: Row(
             children: [
-              // Back button
               GestureDetector(
                 onTap: () => Navigator.pop(context),
                 child: Container(
@@ -176,28 +172,29 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                     color: Colors.white.withOpacity(0.1),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.arrow_back, color: AppColors.cream, size: 20),
+                  child: const Icon(Icons.arrow_back,
+                      color: AppColors.cream, size: 20),
                 ),
               ),
               const SizedBox(width: 10),
-              // Search field
               Expanded(
                 child: Container(
                   height: 42,
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14)),
                   child: Row(
                     children: [
                       const SizedBox(width: 12),
-                      const Icon(Icons.search, color: AppColors.brownMid, size: 18),
+                      const Icon(Icons.search,
+                          color: AppColors.brownMid, size: 18),
                       const SizedBox(width: 8),
                       Expanded(
                         child: TextField(
                           controller: _controller,
                           focusNode: _focusNode,
-                          onChanged: (_) => setState(() {}),
+                          onChanged: _onSearchChanged,
+                          onSubmitted: (_) => _rememberSearch(),
                           style: const TextStyle(
                             color: AppColors.brownDeep,
                             fontSize: 14,
@@ -206,10 +203,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                           decoration: const InputDecoration(
                             hintText: 'Search doctors, hospitals...',
                             hintStyle: TextStyle(
-                              color: Color(0xFFB69A83),
-                              fontSize: 14,
-                              fontWeight: FontWeight.w400,
-                            ),
+                                color: Color(0xFFB69A83), fontSize: 14),
                             border: InputBorder.none,
                             isDense: true,
                             contentPadding: EdgeInsets.zero,
@@ -222,12 +216,12 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                           child: Container(
                             width: 22,
                             height: 22,
-                            margin: EdgeInsets.only(right: 10),
-                            decoration: BoxDecoration(
-                              color: AppColors.surface,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(Icons.close, size: 12, color: AppColors.brownDeep),
+                            margin: const EdgeInsets.only(right: 10),
+                            decoration: const BoxDecoration(
+                                color: AppColors.surface,
+                                shape: BoxShape.circle),
+                            child: const Icon(Icons.close,
+                                size: 12, color: AppColors.brownDeep),
                           ),
                         )
                       else
@@ -243,47 +237,36 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
     );
   }
 
-  // ── Empty state (no query) ──────────────────────────────────────────────
-
   Widget _buildEmptyState() {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // Quick Actions
         _buildSectionLabel('QUICK ACTIONS'),
         const SizedBox(height: 10),
         _buildQuickActions(),
         const SizedBox(height: 24),
-
-        // Recent Searches
         if (_recentSearches.isNotEmpty) ...[
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: const [
+              const Row(
+                children: [
                   Icon(Icons.history, color: AppColors.brownLight, size: 16),
                   SizedBox(width: 6),
-                  Text(
-                    'Recent Searches',
-                    style: TextStyle(
-                      color: AppColors.brownDeep,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  Text('Recent Searches',
+                      style: TextStyle(
+                          color: AppColors.brownDeep,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600)),
                 ],
               ),
               GestureDetector(
-                onTap: _clearAllRecent,
-                child: const Text(
-                  'Clear All',
-                  style: TextStyle(
-                    color: AppColors.accent,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+                onTap: () => setState(_recentSearches.clear),
+                child: const Text('Clear All',
+                    style: TextStyle(
+                        color: AppColors.accent,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600)),
               ),
             ],
           ),
@@ -291,24 +274,19 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: _recentSearches.map((s) => _buildRecentChip(s)).toList(),
+            children: _recentSearches.map(_buildRecentChip).toList(),
           ),
           const SizedBox(height: 24),
         ],
-
-        // Trending Specialties
         const Row(
           children: [
             Icon(Icons.trending_up, color: AppColors.brownLight, size: 16),
             SizedBox(width: 6),
-            Text(
-              'Trending Specialties',
-              style: TextStyle(
-                color: AppColors.brownDeep,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            Text('Trending Specialties',
+                style: TextStyle(
+                    color: AppColors.brownDeep,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600)),
           ],
         ),
         const SizedBox(height: 10),
@@ -321,38 +299,44 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
     return Text(
       title,
       style: const TextStyle(
-        color: AppColors.brownLight,
-        fontSize: 12,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 1.0,
-      ),
+          color: AppColors.brownLight,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.0),
     );
   }
 
   Widget _buildQuickActions() {
     final actions = [
-      (icon: Icons.medical_services_outlined, label: 'Find Doctor', color: const Color(0xFFE3F2FD), iconColor: const Color(0xFF1976D2)),
-      (icon: Icons.local_hospital_outlined, label: 'Hospitals', color: const Color(0xFFFFF3E0), iconColor: const Color(0xFFE65100)),
-      (icon: Icons.location_on_outlined, label: 'Nearby', color: const Color(0xFFE8F5E9), iconColor: const Color(0xFF2E7D32)),
+      (
+        icon: Icons.medical_services_outlined,
+        label: 'Find Doctor',
+        route: '/doctor-list'
+      ),
+      (
+        icon: Icons.local_hospital_outlined,
+        label: 'Hospitals',
+        route: '/hospital-list'
+      ),
+      (
+        icon: Icons.location_on_outlined,
+        label: 'Nearby',
+        route: '/hospital-list'
+      ),
     ];
 
     return Row(
-      children: actions.map((a) {
+      children: actions.map((action) {
         return Expanded(
           child: Padding(
-            padding: EdgeInsets.only(
-              right: a == actions.last ? 0 : 10,
-            ),
+            padding: EdgeInsets.only(right: action == actions.last ? 0 : 10),
             child: GestureDetector(
-              onTap: () {
-                if (a.label == 'Find Doctor') {
-                  Navigator.pushNamed(context, '/doctor-list');
-                } else if (a.label == 'Hospitals') {
-                  Navigator.pushNamed(context, '/hospital-list');
-                } else if (a.label == 'Nearby') {
-                  Navigator.pushNamed(context, '/hospital-list', arguments: {'nearbyOnly': true});
-                }
-              },
+              onTap: () => Navigator.pushNamed(
+                context,
+                action.route,
+                arguments:
+                    action.label == 'Nearby' ? {'nearbyOnly': true} : null,
+              ),
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 decoration: BoxDecoration(
@@ -365,21 +349,17 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                     Container(
                       width: 42,
                       height: 42,
-                      decoration: BoxDecoration(
-                        color: a.color,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(a.icon, size: 22, color: a.iconColor),
+                      decoration: const BoxDecoration(
+                          color: AppColors.cream, shape: BoxShape.circle),
+                      child: Icon(action.icon,
+                          size: 22, color: AppColors.brownDeep),
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      a.label,
-                      style: const TextStyle(
-                        color: AppColors.brownDeep,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    Text(action.label,
+                        style: const TextStyle(
+                            color: AppColors.brownDeep,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600)),
                   ],
                 ),
               ),
@@ -403,26 +383,19 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
         children: [
           GestureDetector(
             onTap: () => _setQuery(search),
-            child: Text(
-              search,
-              style: const TextStyle(
-                color: AppColors.brownMid,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
+            child: Text(search,
+                style: const TextStyle(
+                    color: AppColors.brownMid,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500)),
           ),
           const SizedBox(width: 4),
           GestureDetector(
-            onTap: () => _removeRecent(search),
-            child: Container(
+            onTap: () => setState(() => _recentSearches.remove(search)),
+            child: const SizedBox(
               width: 18,
               height: 18,
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.close, size: 10, color: AppColors.brownLight),
+              child: Icon(Icons.close, size: 10, color: AppColors.brownLight),
             ),
           ),
         ],
@@ -431,8 +404,14 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
   }
 
   Widget _buildTrendingGrid() {
-    const specialties = ['Cardiology', 'Pediatrics', 'Neurology', 'Dermatology', 'Orthopedics', 'Psychiatry'];
-
+    const specialties = [
+      'Cardiology',
+      'Pediatrics',
+      'Neurology',
+      'Dermatology',
+      'Orthopedics',
+      'Psychiatry'
+    ];
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -443,59 +422,52 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
         mainAxisExtent: 50,
       ),
       itemCount: specialties.length,
-      itemBuilder: (context, i) {
-        return GestureDetector(
-          onTap: () => _setQuery(specialties[i]),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: AppColors.cream,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.surface),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 30,
-                  height: 30,
-                  decoration: BoxDecoration(
+      itemBuilder: (context, index) => GestureDetector(
+        onTap: () => _setQuery(specialties[index]),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: AppColors.cream,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.surface),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
                     color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.medical_services_outlined, size: 16, color: AppColors.brownDeep),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    specialties[i],
-                    style: const TextStyle(
+                    borderRadius: BorderRadius.circular(10)),
+                child: const Icon(Icons.medical_services_outlined,
+                    size: 16, color: AppColors.brownDeep),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  specialties[index],
+                  style: const TextStyle(
                       color: AppColors.brownDeep,
                       fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                      fontWeight: FontWeight.w500),
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
-
-  // ── Results state (with query) ──────────────────────────────────────────
 
   Widget _buildResultsState() {
     return Column(
       children: [
-        // Tab bar
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           decoration: const BoxDecoration(
-            color: AppColors.warmWhite,
-            border: Border(bottom: BorderSide(color: AppColors.surface, width: 1)),
-          ),
+              color: AppColors.warmWhite,
+              border: Border(bottom: BorderSide(color: AppColors.surface))),
           child: Row(
             children: [
               _buildTab('all', 'All'),
@@ -506,9 +478,15 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
             ],
           ),
         ),
-        // Results
         Expanded(
-          child: _hasResults ? _buildResultsList() : _buildNoResults(),
+          child: _isLoading
+              ? const Center(
+                  child: CircularProgressIndicator(color: AppColors.accent))
+              : _errorMessage != null
+                  ? _buildErrorState()
+                  : _hasResults
+                      ? _buildResultsList()
+                      : _buildNoResults(),
         ),
       ],
     );
@@ -528,73 +506,74 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
         child: Text(
           label,
           style: TextStyle(
-            color: isActive ? AppColors.cream : AppColors.brownMid,
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-          ),
+              color: isActive ? AppColors.cream : AppColors.brownMid,
+              fontSize: 13,
+              fontWeight: FontWeight.w600),
         ),
       ),
     );
   }
 
+  Widget _buildErrorState() {
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        Text(_errorMessage!,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: AppColors.brownMid, fontSize: 13)),
+        const SizedBox(height: 12),
+        OutlinedButton(onPressed: _loadResults, child: const Text('Retry')),
+      ],
+    );
+  }
+
   Widget _buildNoResults() {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              color: AppColors.cream,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.search_off, size: 32, color: AppColors.surface),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'No results found',
-            style: TextStyle(
-              color: AppColors.brownDeep,
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 60),
-            child: Text(
-              'We couldn\'t find anything matching "${_controller.text}". Try checking your spelling or use more general terms.',
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.search_off, size: 44, color: AppColors.surface),
+            const SizedBox(height: 16),
+            const Text('No results found',
+                style: TextStyle(
+                    color: AppColors.brownDeep,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600)),
+            const SizedBox(height: 6),
+            Text(
+              'We could not find anything matching "${_controller.text}". Try a specialty, doctor name, or hospital city.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: AppColors.brownMid.withOpacity(0.6),
-                fontSize: 14,
-                fontWeight: FontWeight.w400,
-              ),
+                  color: AppColors.brownMid.withOpacity(0.7), fontSize: 14),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildResultsList() {
-    final showDoctors = (_activeTab == 'all' || _activeTab == 'doctors') && _filteredDoctors.isNotEmpty;
-    final showHospitals = (_activeTab == 'all' || _activeTab == 'hospitals') && _filteredHospitals.isNotEmpty;
+    final hospitals = _filteredHospitals;
+    final showDoctors =
+        (_activeTab == 'all' || _activeTab == 'doctors') && _doctors.isNotEmpty;
+    final showHospitals = (_activeTab == 'all' || _activeTab == 'hospitals') &&
+        hospitals.isNotEmpty;
 
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         if (showDoctors) ...[
-          _buildResultSectionHeader('DOCTORS', _filteredDoctors.length),
+          _buildResultSectionHeader('DOCTORS', _doctors.length),
           const SizedBox(height: 10),
-          ..._filteredDoctors.map((d) => _buildDoctorResult(d)),
+          ..._doctors.map(_buildDoctorResult),
           const SizedBox(height: 20),
         ],
         if (showHospitals) ...[
-          _buildResultSectionHeader('HOSPITALS', _filteredHospitals.length),
+          _buildResultSectionHeader('HOSPITALS', hospitals.length),
           const SizedBox(height: 10),
-          ..._filteredHospitals.map((h) => _buildHospitalResult(h)),
+          ...hospitals.map(_buildHospitalResult),
         ],
       ],
     );
@@ -604,196 +583,163 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          title,
-          style: const TextStyle(
-            color: AppColors.brownLight,
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 1.0,
-          ),
-        ),
+        Text(title,
+            style: const TextStyle(
+                color: AppColors.brownLight,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.0)),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
           decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Text(
-            '$count found',
-            style: const TextStyle(
-              color: AppColors.brownDeep,
-              fontSize: 10,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(12)),
+          child: Text('$count found',
+              style: const TextStyle(
+                  color: AppColors.brownDeep,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w500)),
         ),
       ],
     );
   }
 
-  Widget _buildDoctorResult(dynamic doctor) {
+  Widget _buildDoctorResult(PatientDoctor doctor) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: GestureDetector(
         onTap: () {
-          Navigator.pushNamed(context, '/doctor-list', arguments: {'searchQuery': doctor.name});
-        },
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.surface),
-          ),
-          child: Row(
-            children: [
-              // Avatar
-              Container(
-                width: 48,
-                height: 48,
-                decoration: const BoxDecoration(
-                  color: AppColors.accent,
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  doctor.name.toString().length > 3 ? doctor.name.toString()[3] : 'D',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              // Info
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      doctor.name,
-                      style: const TextStyle(
-                        color: AppColors.brownDeep,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      doctor.specialty,
-                      style: const TextStyle(
-                        color: AppColors.brownMid,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      doctor.hospital,
-                      style: const TextStyle(
-                        color: AppColors.brownLight,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(Icons.chevron_right, color: AppColors.surface, size: 22),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHospitalResult(dynamic hospital) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: GestureDetector(
-        onTap: () {
+          _rememberSearch();
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => HospitalDetailScreen(hospitalName: hospital.name),
+              builder: (_) => DoctorProfileScreen(
+                id: doctor.id,
+                hospitalId: doctor.hospitalId,
+                name: doctor.name,
+                specialty: doctor.specialty,
+                hospital: doctor.hospitalName,
+                experience: doctor.experience,
+                totalPatients: doctor.totalPatients,
+                fee: doctor.fee,
+              ),
             ),
           );
         },
         child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.surface),
-          ),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.surface)),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Icon
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Icon(Icons.local_hospital_outlined, size: 24, color: AppColors.brownDeep),
+              CircleAvatar(
+                radius: 24,
+                backgroundColor: AppColors.accent,
+                child: Text(_avatarLetter(doctor.name),
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700)),
               ),
               const SizedBox(width: 12),
-              // Info
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      hospital.name,
-                      style: const TextStyle(
-                        color: AppColors.brownDeep,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    Text(doctor.name,
+                        style: const TextStyle(
+                            color: AppColors.brownDeep,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600),
+                        overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 2),
+                    Text(doctor.specialty,
+                        style: const TextStyle(
+                            color: AppColors.brownMid,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 2),
+                    Text(doctor.hospitalName,
+                        style: const TextStyle(
+                            color: AppColors.brownLight, fontSize: 11),
+                        overflow: TextOverflow.ellipsis),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right,
+                  color: AppColors.surface, size: 22),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHospitalResult(PatientHospital hospital) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: GestureDetector(
+        onTap: () {
+          _rememberSearch();
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => HospitalDetailScreen(
+                  hospitalName: hospital.name, hospitalId: hospital.id),
+            ),
+          );
+        },
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.surface)),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(14)),
+                child: const Icon(Icons.local_hospital_outlined,
+                    size: 24, color: AppColors.brownDeep),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(hospital.name,
+                        style: const TextStyle(
+                            color: AppColors.brownDeep,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600),
+                        overflow: TextOverflow.ellipsis),
                     const SizedBox(height: 3),
                     Row(
                       children: [
-                        const Icon(Icons.location_on_outlined, size: 12, color: AppColors.brownMid),
+                        const Icon(Icons.location_on_outlined,
+                            size: 12, color: AppColors.brownMid),
                         const SizedBox(width: 3),
-                        Text(
-                          '${hospital.location} • ${hospital.distance}',
-                          style: const TextStyle(
-                            color: AppColors.brownMid,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
+                        Expanded(
+                          child: Text(
+                              '${hospital.city} - ${hospital.doctorCount} doctors',
+                              style: const TextStyle(
+                                  color: AppColors.brownMid, fontSize: 12),
+                              overflow: TextOverflow.ellipsis),
                         ),
                       ],
                     ),
                     const SizedBox(height: 6),
                     Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      children: (hospital.tags as List<String>).take(2).map((t) {
-                        return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: AppColors.cream,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            t,
-                            style: const TextStyle(
-                              color: AppColors.brownLight,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: hospital.tags.take(2).map(_tagChip).toList()),
                   ],
                 ),
               ),
@@ -802,5 +748,24 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
         ),
       ),
     );
+  }
+
+  Widget _tagChip(String tag) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+          color: AppColors.cream, borderRadius: BorderRadius.circular(12)),
+      child: Text(tag,
+          style: const TextStyle(
+              color: AppColors.brownLight,
+              fontSize: 10,
+              fontWeight: FontWeight.w500)),
+    );
+  }
+
+  String _avatarLetter(String name) {
+    final cleaned =
+        name.replaceFirst(RegExp(r'^Dr\.\s*', caseSensitive: false), '').trim();
+    return cleaned.isEmpty ? 'D' : cleaned[0].toUpperCase();
   }
 }

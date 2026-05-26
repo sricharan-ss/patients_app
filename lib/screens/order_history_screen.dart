@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/app_colors.dart';
 import '../services/patient_api_service.dart';
+import 'order_medicines_screen.dart';
 import 'order_tracking_screen.dart';
 
 class OrderHistoryScreen extends StatefulWidget {
@@ -61,6 +62,19 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
   double _toDouble(dynamic value, [double fallback = 0]) {
     if (value is num) return value.toDouble();
     return double.tryParse(value?.toString() ?? '') ?? fallback;
+  }
+
+  Map<String, int> _reorderCart(List<Map<String, dynamic>> items) {
+    final cart = <String, int>{};
+    for (final item in items) {
+      final id = _text(
+        item['prescriptionMedicineId'],
+        _text(item['medicineId']),
+      );
+      if (id.isEmpty) continue;
+      cart[id] = (cart[id] ?? 0) + (int.tryParse(_text(item['quantity'])) ?? 1);
+    }
+    return cart;
   }
 
   @override
@@ -144,8 +158,9 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                           final statusBg = isDelivered
                               ? const Color(0xFFD5F2DE)
                               : const Color(0xFFF7E4BE);
-                          final statusText =
-                              isDelivered ? const Color(0xFF2E7D32) : AppColors.accent;
+                          final statusText = isDelivered
+                              ? const Color(0xFF2E7D32)
+                              : AppColors.accent;
 
                           return Container(
                             padding: const EdgeInsets.all(16),
@@ -172,7 +187,8 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                                     ),
                                     const SizedBox(width: 8),
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 2),
                                       decoration: BoxDecoration(
                                         color: statusBg,
                                         borderRadius: BorderRadius.circular(12),
@@ -238,31 +254,76 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                                   ],
                                 ),
                                 const SizedBox(height: 12),
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: ElevatedButton.icon(
-                                    onPressed: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) => OrderTrackingScreen(
-                                            orderId: _text(order['id']),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: OutlinedButton.icon(
+                                        onPressed: items.isEmpty
+                                            ? null
+                                            : () async {
+                                                await Navigator.push(
+                                                  context,
+                                                  MaterialPageRoute(
+                                                    builder: (_) =>
+                                                        OrderMedicinesScreen(
+                                                      initialCart:
+                                                          _reorderCart(items),
+                                                      initialOrderId:
+                                                          _text(order['id']),
+                                                    ),
+                                                  ),
+                                                );
+                                                if (mounted) _loadOrders();
+                                              },
+                                        icon: const Icon(
+                                            Icons.shopping_bag_outlined,
+                                            size: 16),
+                                        label: const Text('Order Again'),
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: AppColors.brownDeep,
+                                          side: const BorderSide(
+                                              color: AppColors.brownDeep),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(12),
                                           ),
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 12),
                                         ),
-                                      );
-                                    },
-                                    icon: const Icon(Icons.local_shipping_outlined, size: 16),
-                                    label: const Text('Track Order'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppColors.brownDeep,
-                                      foregroundColor: AppColors.cream,
-                                      elevation: 0,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
                                       ),
-                                      padding: const EdgeInsets.symmetric(vertical: 12),
                                     ),
-                                  ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: ElevatedButton.icon(
+                                        onPressed: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) =>
+                                                  OrderTrackingScreen(
+                                                orderId: _text(order['id']),
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                        icon: const Icon(
+                                            Icons.local_shipping_outlined,
+                                            size: 16),
+                                        label: const Text('Track Order'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: AppColors.brownDeep,
+                                          foregroundColor: AppColors.cream,
+                                          elevation: 0,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                          ),
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 12),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
