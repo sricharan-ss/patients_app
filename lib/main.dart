@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'core/app_theme.dart';
 import 'core/session_store.dart';
+import 'services/medication_notification_service.dart';
 import 'screens/landing_page.dart';
 import 'screens/phone_input_screen.dart';
 import 'screens/login_phone_input_screen.dart';
@@ -16,9 +17,10 @@ import 'screens/doctor_list_screen.dart';
 import 'screens/search_results_screen.dart';
 import 'screens/notification_center_screen.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  await MedicationNotificationService.initialize();
   runApp(const VitaDataApp());
 }
 

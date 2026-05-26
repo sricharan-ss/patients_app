@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../services/medication_notification_service.dart';
 import '../services/patient_api_service.dart';
 import 'order_medicines_screen.dart';
 import 'order_tracking_screen.dart';
@@ -20,11 +23,19 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
   List<Map<String, dynamic>> _refillAlerts = const [];
   List<Map<String, dynamic>> _orders = const [];
   final Set<String> _updatingScheduleIds = <String>{};
+  Timer? _midnightResetTimer;
 
   @override
   void initState() {
     super.initState();
+    _scheduleMidnightReset();
     _loadMedicationDashboard();
+  }
+
+  @override
+  void dispose() {
+    _midnightResetTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadMedicationDashboard() async {
@@ -43,6 +54,7 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
       if (orders.isEmpty) {
         orders = await PatientApiService.getMedicationOrders(limit: 5);
       }
+      await MedicationNotificationService.syncMedicationReminders(schedule);
 
       if (!mounted) return;
       setState(() {
@@ -115,6 +127,219 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
         setState(() => _updatingScheduleIds.remove(id));
       }
     }
+  }
+
+  void _scheduleMidnightReset() {
+    _midnightResetTimer?.cancel();
+    final now = DateTime.now();
+    final tomorrow = DateTime(now.year, now.month, now.day + 1);
+    final delay = tomorrow.difference(now) + const Duration(seconds: 2);
+    _midnightResetTimer = Timer(delay, () {
+      if (!mounted) return;
+      _loadMedicationDashboard();
+      _scheduleMidnightReset();
+    });
+  }
+
+  Future<void> _deleteSchedule(Map<String, dynamic> schedule) async {
+    final id = _text(schedule['id']);
+    if (id.isEmpty || _updatingScheduleIds.contains(id)) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove medicine?'),
+        content: Text(
+          'Remove ${_text(schedule['medicineName'], 'this medicine')} from your schedule?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _updatingScheduleIds.add(id));
+    try {
+      await PatientApiService.deleteMedicationSchedule(id);
+      await MedicationNotificationService.cancelMedicationReminder(id);
+      await _loadMedicationDashboard();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(PatientApiService.friendlyError(error))),
+      );
+    } finally {
+      if (mounted) setState(() => _updatingScheduleIds.remove(id));
+    }
+  }
+
+  Future<void> _showScheduleForm([Map<String, dynamic>? schedule]) async {
+    final existingSchedule = schedule;
+    final editing = existingSchedule != null;
+    final nameController = TextEditingController(
+      text: existingSchedule == null ? '' : _text(existingSchedule['medicineName']),
+    );
+    final quantityController = TextEditingController(
+      text: existingSchedule == null
+          ? '1'
+          : _toInt(existingSchedule['quantity'], 1).toString(),
+    );
+    final instructionsController = TextEditingController(
+      text: existingSchedule == null ? '' : _text(existingSchedule['instructions']),
+    );
+    TimeOfDay selectedTime = _parseTimeOfDay(
+      existingSchedule == null ? '' : _text(existingSchedule['timeOfDay']),
+    );
+    bool isSaving = false;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFFFFFDF8),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            Future<void> save() async {
+              final name = nameController.text.trim();
+              final quantity = int.tryParse(quantityController.text.trim()) ?? 1;
+              var closeSheet = false;
+              if (name.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Medicine name is required')),
+                );
+                return;
+              }
+
+              setSheetState(() => isSaving = true);
+              final timeText = _timeToApi(selectedTime);
+              try {
+                if (existingSchedule != null) {
+                  await PatientApiService.updateMedicationSchedule(
+                    scheduleId: _text(existingSchedule['id']),
+                    medicineName: name,
+                    quantity: quantity,
+                    timeOfDay: timeText,
+                    instructions: instructionsController.text,
+                  );
+                } else {
+                  await PatientApiService.createMedicationSchedule(
+                    medicineName: name,
+                    quantity: quantity,
+                    timeOfDay: timeText,
+                    instructions: instructionsController.text,
+                  );
+                }
+                if (!mounted) return;
+                closeSheet = true;
+                Navigator.pop(context);
+                await _loadMedicationDashboard();
+              } catch (error) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(PatientApiService.friendlyError(error))),
+                );
+              } finally {
+                if (!closeSheet && mounted) {
+                  setSheetState(() => isSaving = false);
+                }
+              }
+            }
+
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 18,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 18,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    editing ? 'Edit Medicine Schedule' : 'Add Medicine Schedule',
+                    style: const TextStyle(
+                      color: Color(0xFF3B1F0A),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: nameController,
+                    textInputAction: TextInputAction.next,
+                    decoration: _inputDecoration('Medicine name'),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: quantityController,
+                          keyboardType: TextInputType.number,
+                          decoration: _inputDecoration('Quantity'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            final picked = await showTimePicker(
+                              context: context,
+                              initialTime: selectedTime,
+                            );
+                            if (picked != null) {
+                              setSheetState(() => selectedTime = picked);
+                            }
+                          },
+                          icon: const Icon(Icons.schedule, size: 18),
+                          label: Text(selectedTime.format(context)),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: instructionsController,
+                    minLines: 2,
+                    maxLines: 3,
+                    decoration: _inputDecoration('Instructions'),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: isSaving ? null : save,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF3B1F0A),
+                        foregroundColor: const Color(0xFFFBF6EC),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      child: Text(isSaving ? 'Saving...' : 'Save Schedule'),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    nameController.dispose();
+    quantityController.dispose();
+    instructionsController.dispose();
   }
 
   @override
@@ -210,16 +435,24 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                const Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    "Today's Schedule",
-                    style: TextStyle(
-                      color: Color(0xFF3B1F0A),
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        "Today's Schedule",
+                        style: TextStyle(
+                          color: Color(0xFF3B1F0A),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                     ),
-                  ),
+                    TextButton.icon(
+                      onPressed: () => _showScheduleForm(),
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('Add'),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 12),
                 if (_todaySchedule.isEmpty)
@@ -262,7 +495,7 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    '${_text(med['medicineName'], 'Medicine')} ${_text(med['dosage'])}',
+                                    '${_text(med['medicineName'], 'Medicine')} x${_toInt(med['quantity'], 1)} ${_text(med['dosage'])}',
                                     style: const TextStyle(
                                       color: Color(0xFF3B1F0A),
                                       fontSize: 14,
@@ -271,7 +504,12 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    '${_formatTime(_text(med['timeOfDay']))}${isPaused ? ' - paused' : ''}',
+                                    [
+                                      _formatTime(_text(med['timeOfDay'])),
+                                      if (_text(med['instructions']).isNotEmpty)
+                                        _text(med['instructions']),
+                                      if (isPaused) 'paused',
+                                    ].join(' - '),
                                     style: const TextStyle(
                                       color: Color(0xFF6B3A1F),
                                       fontSize: 12,
@@ -316,13 +554,23 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
                             const SizedBox(width: 8),
                             PopupMenuButton<String>(
                               enabled: !isUpdating,
-                              onSelected: (action) => _changeScheduleStatus(med, action),
+                              onSelected: (action) {
+                                if (action == 'edit') {
+                                  _showScheduleForm(med);
+                                } else if (action == 'delete') {
+                                  _deleteSchedule(med);
+                                } else {
+                                  _changeScheduleStatus(med, action);
+                                }
+                              },
                               itemBuilder: (_) => [
+                                const PopupMenuItem(value: 'edit', child: Text('Edit')),
                                 PopupMenuItem(
                                   value: isPaused ? 'resume' : 'pause',
                                   child: Text(isPaused ? 'Resume' : 'Pause'),
                                 ),
                                 const PopupMenuItem(value: 'cancel', child: Text('Cancel')),
+                                const PopupMenuItem(value: 'delete', child: Text('Remove')),
                               ],
                             ),
                           ],
@@ -583,5 +831,46 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
     } catch (_) {
       return isoString;
     }
+  }
+
+  TimeOfDay _parseTimeOfDay(String value) {
+    final parts = value.split(':');
+    if (parts.length >= 2) {
+      final hour = int.tryParse(parts[0]);
+      final minute = int.tryParse(parts[1]);
+      if (hour != null &&
+          minute != null &&
+          hour >= 0 &&
+          hour <= 23 &&
+          minute >= 0 &&
+          minute <= 59) {
+        return TimeOfDay(hour: hour, minute: minute);
+      }
+    }
+    return const TimeOfDay(hour: 9, minute: 0);
+  }
+
+  String _timeToApi(TimeOfDay time) {
+    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+  }
+
+  InputDecoration _inputDecoration(String label) {
+    return InputDecoration(
+      labelText: label,
+      filled: true,
+      fillColor: const Color(0xFFFBF6EC),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFEFE2CC)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFEFE2CC)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFD4822A)),
+      ),
+    );
   }
 }

@@ -209,6 +209,51 @@ class PatientApiService {
         '/api/mobile/patient/medications/schedules/$scheduleId/taken', {});
   }
 
+  static Future<Map<String, dynamic>> createMedicationSchedule({
+    String? medicineId,
+    required String medicineName,
+    required int quantity,
+    required String timeOfDay,
+    int frequencyPerDay = 1,
+    String? instructions,
+  }) {
+    return _postMap('/api/mobile/patient/medications/schedules', {
+      if (medicineId != null && medicineId.trim().isNotEmpty)
+        'medicineId': medicineId.trim(),
+      if (medicineName.trim().isNotEmpty) 'medicineName': medicineName.trim(),
+      'quantity': quantity,
+      'timeOfDay': timeOfDay,
+      'frequencyPerDay': frequencyPerDay,
+      if (instructions != null && instructions.trim().isNotEmpty)
+        'instructions': instructions.trim(),
+    });
+  }
+
+  static Future<Map<String, dynamic>> updateMedicationSchedule({
+    required String scheduleId,
+    String? medicineId,
+    String? medicineName,
+    int? quantity,
+    String? timeOfDay,
+    int? frequencyPerDay,
+    String? instructions,
+  }) {
+    return _patchMap('/api/mobile/patient/medications/schedules/$scheduleId', {
+      if (medicineId != null && medicineId.trim().isNotEmpty)
+        'medicineId': medicineId.trim(),
+      if (medicineName != null) 'medicineName': medicineName.trim(),
+      if (quantity != null) 'quantity': quantity,
+      if (timeOfDay != null) 'timeOfDay': timeOfDay,
+      if (frequencyPerDay != null) 'frequencyPerDay': frequencyPerDay,
+      if (instructions != null) 'instructions': instructions.trim(),
+    });
+  }
+
+  static Future<Map<String, dynamic>> deleteMedicationSchedule(
+      String scheduleId) {
+    return _deleteMap('/api/mobile/patient/medications/schedules/$scheduleId');
+  }
+
   static Future<Map<String, dynamic>> updateMedicationScheduleStatus({
     required String scheduleId,
     required String action,
@@ -344,6 +389,15 @@ class PatientApiService {
   ) async {
     final decoded = await _request(
       () => http.patch(_uri(path), headers: _headers(), body: jsonEncode(body)),
+    );
+    final data = decoded['data'];
+    if (data is Map<String, dynamic>) return data;
+    return <String, dynamic>{};
+  }
+
+  static Future<Map<String, dynamic>> _deleteMap(String path) async {
+    final decoded = await _request(
+      () => http.delete(_uri(path), headers: _headers()),
     );
     final data = decoded['data'];
     if (data is Map<String, dynamic>) return data;
