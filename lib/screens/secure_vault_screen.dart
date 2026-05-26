@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:url_launcher/url_launcher.dart';
 import '../services/patient_api_service.dart';
 
 class SecureVaultScreen extends StatefulWidget {
@@ -15,6 +16,19 @@ class _SecureVaultScreenState extends State<SecureVaultScreen> {
   bool _isLoading = true;
   bool _isUploading = false;
   String? _errorMessage;
+
+  Future<void> _openVaultLink(String? value) async {
+    final url = value?.trim() ?? '';
+    final uri = Uri.tryParse(url);
+    if (uri == null || !uri.hasScheme) return;
+
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!launched && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open vault link')),
+      );
+    }
+  }
 
   @override
   void initState() {
@@ -43,6 +57,7 @@ class _SecureVaultScreenState extends State<SecureVaultScreen> {
                 'type': ext == 'pdf' ? 'pdf' : 'image',
                 'date': DateTime.now().toIso8601String(),
                 'size': 'Cloud file',
+                'url': file['fileUrl']?.toString() ?? '',
               };
             }),
           );
@@ -202,7 +217,7 @@ class _SecureVaultScreenState extends State<SecureVaultScreen> {
                     final isPdf = file['type'] == 'pdf';
 
                     return GestureDetector(
-                      onTap: () {},
+                      onTap: () => _openVaultLink(file['url']),
                       child: Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -260,11 +275,15 @@ class _SecureVaultScreenState extends State<SecureVaultScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              file['size']!,
+                              file['url']!.isEmpty
+                                  ? file['size']!
+                                  : file['url']!,
                               style: const TextStyle(
                                 color: Color(0xFFA0622A),
                                 fontSize: 10,
                               ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),

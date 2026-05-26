@@ -56,7 +56,8 @@ class PatientApiService {
   }
 
   static String friendlyError(Object error) {
-    final message = error is PatientApiException ? error.message : error.toString();
+    final message =
+        error is PatientApiException ? error.message : error.toString();
     final normalized = message.replaceFirst('Exception: ', '').trim();
     final lower = normalized.toLowerCase();
 
@@ -74,10 +75,14 @@ class PatientApiService {
     if (lower.contains('validation') ||
         lower.contains('required') ||
         lower.contains('invalid')) {
-      return normalized.isEmpty ? 'Please check the details and try again.' : normalized;
+      return normalized.isEmpty
+          ? 'Please check the details and try again.'
+          : normalized;
     }
     if (lower.contains('upload') || lower.contains('file')) {
-      return normalized.isEmpty ? 'Could not upload the file. Please try again.' : normalized;
+      return normalized.isEmpty
+          ? 'Could not upload the file. Please try again.'
+          : normalized;
     }
     if (normalized.isEmpty) return 'Something went wrong. Please try again.';
     return normalized;
@@ -134,8 +139,14 @@ class PatientApiService {
     return _getMap('/api/mobile/patient/medications/dashboard');
   }
 
-  static Future<List<Map<String, dynamic>>> getOrderableMedicines() async {
-    final data = await _getList('/api/mobile/patient/medications/orderable');
+  static Future<List<Map<String, dynamic>>> getOrderableMedicines({
+    String? query,
+    int limit = 50,
+  }) async {
+    final data = await _getList('/api/mobile/patient/medications/orderable', {
+      'q': query,
+      'limit': '$limit',
+    });
     return _mapList(data);
   }
 
@@ -150,7 +161,8 @@ class PatientApiService {
     return _mapList(data);
   }
 
-  static Future<Map<String, dynamic>> getMedicationOrderById(String orderId) async {
+  static Future<Map<String, dynamic>> getMedicationOrderById(
+      String orderId) async {
     return _getMap('/api/mobile/patient/medications/orders/$orderId');
   }
 
@@ -181,7 +193,8 @@ class PatientApiService {
     return _postMap('/api/mobile/patient/medications/orders', {
       if (hospitalId != null && hospitalId.trim().isNotEmpty)
         'hospitalId': hospitalId.trim(),
-      if (sourcePrescriptionId != null && sourcePrescriptionId.trim().isNotEmpty)
+      if (sourcePrescriptionId != null &&
+          sourcePrescriptionId.trim().isNotEmpty)
         'sourcePrescriptionId': sourcePrescriptionId.trim(),
       'orderType': orderType,
       if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
@@ -192,19 +205,22 @@ class PatientApiService {
   }
 
   static Future<Map<String, dynamic>> markMedicationTaken(String scheduleId) {
-    return _postMap('/api/mobile/patient/medications/schedules/$scheduleId/taken', {});
+    return _postMap(
+        '/api/mobile/patient/medications/schedules/$scheduleId/taken', {});
   }
 
   static Future<Map<String, dynamic>> updateMedicationScheduleStatus({
     required String scheduleId,
     required String action,
   }) {
-    return _patchMap('/api/mobile/patient/medications/schedules/$scheduleId/status', {
+    return _patchMap(
+        '/api/mobile/patient/medications/schedules/$scheduleId/status', {
       'action': action,
     });
   }
 
-  static Future<List<Map<String, dynamic>>> createMedicationSchedulesFromPrescription({
+  static Future<List<Map<String, dynamic>>>
+      createMedicationSchedulesFromPrescription({
     required String prescriptionId,
     DateTime? startDate,
   }) async {
@@ -214,7 +230,8 @@ class PatientApiService {
         headers: _headers(),
         body: jsonEncode({
           'prescriptionId': prescriptionId,
-          if (startDate != null) 'startDate': startDate.toUtc().toIso8601String(),
+          if (startDate != null)
+            'startDate': startDate.toUtc().toIso8601String(),
         }),
       ),
     );
@@ -222,7 +239,8 @@ class PatientApiService {
   }
 
   static Future<Map<String, dynamic>> cancelMedicationOrder(String orderId) {
-    return _postMap('/api/mobile/patient/medications/orders/$orderId/cancel', {});
+    return _postMap(
+        '/api/mobile/patient/medications/orders/$orderId/cancel', {});
   }
 
   static Future<List<Map<String, dynamic>>> getNotifications({
@@ -236,8 +254,10 @@ class PatientApiService {
     return _mapList(data);
   }
 
-  static Future<Map<String, dynamic>> markNotificationRead(String notificationId) {
-    return _postMap('/api/mobile/patient/notifications/$notificationId/read', {});
+  static Future<Map<String, dynamic>> markNotificationRead(
+      String notificationId) {
+    return _postMap(
+        '/api/mobile/patient/notifications/$notificationId/read', {});
   }
 
   static Future<Map<String, dynamic>> toggleFavoriteDoctor(String doctorId) {
@@ -249,17 +269,21 @@ class PatientApiService {
     String? filePath,
     List<int>? bytes,
   }) async {
-    if ((filePath == null || filePath.isEmpty) && (bytes == null || bytes.isEmpty)) {
+    if ((filePath == null || filePath.isEmpty) &&
+        (bytes == null || bytes.isEmpty)) {
       throw const PatientApiException('Please choose a valid file to upload.');
     }
 
     try {
-      final request = http.MultipartRequest('POST', _uri('/api/users/uploadVault'));
+      final request =
+          http.MultipartRequest('POST', _uri('/api/users/uploadVault'));
       request.headers.addAll(_authHeaders());
       if (bytes != null && bytes.isNotEmpty) {
-        request.files.add(http.MultipartFile.fromBytes('file', bytes, filename: fileName));
+        request.files.add(
+            http.MultipartFile.fromBytes('file', bytes, filename: fileName));
       } else {
-        request.files.add(await http.MultipartFile.fromPath('file', filePath!, filename: fileName));
+        request.files.add(await http.MultipartFile.fromPath('file', filePath!,
+            filename: fileName));
       }
 
       final streamed = await request.send();
@@ -276,7 +300,8 @@ class PatientApiService {
       }
     } catch (error) {
       if (error is PatientApiException) rethrow;
-      throw const PatientApiException('Could not upload the file. Please try again.');
+      throw const PatientApiException(
+          'Could not upload the file. Please try again.');
     }
   }
 
@@ -436,6 +461,7 @@ class PatientDoctor {
   final int experience;
   final int fee;
   final bool isAvailable;
+  final String? videoUrl;
 
   const PatientDoctor({
     required this.id,
@@ -450,6 +476,7 @@ class PatientDoctor {
     required this.experience,
     required this.fee,
     required this.isAvailable,
+    this.videoUrl,
   });
 
   factory PatientDoctor.fromJson(dynamic json) {
@@ -467,6 +494,7 @@ class PatientDoctor {
       experience: _int(map['experience'], 8),
       fee: _int(map['fee'], 500),
       isAvailable: map['isAvailable'] != false,
+      videoUrl: _nullableString(map['videoUrl']),
     );
   }
 }

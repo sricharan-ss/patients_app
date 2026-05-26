@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../core/app_colors.dart';
 import '../services/patient_api_service.dart';
 import 'book_appointment_screen.dart';
@@ -12,6 +13,7 @@ class DoctorProfileScreen extends StatefulWidget {
   final int experience;
   final int totalPatients;
   final int fee;
+  final String? videoUrl;
   final bool verified;
   final bool aiRecommended;
 
@@ -25,6 +27,7 @@ class DoctorProfileScreen extends StatefulWidget {
     required this.experience,
     required this.totalPatients,
     required this.fee,
+    this.videoUrl,
     this.verified = true, // default to true to match design
     this.aiRecommended = false,
   });
@@ -36,6 +39,7 @@ class DoctorProfileScreen extends StatefulWidget {
 class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
   bool _isFavorite = false;
   bool _isFavoriteLoading = false;
+  String? _videoUrl;
 
   final _schedule = [
     {
@@ -56,6 +60,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
   @override
   void initState() {
     super.initState();
+    _videoUrl = widget.videoUrl;
     _loadFavoriteState();
   }
 
@@ -63,9 +68,26 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
     try {
       final doctor = await PatientApiService.getDoctor(widget.id);
       if (!mounted) return;
-      setState(() => _isFavorite = doctor['isFavorite'] == true);
+      setState(() {
+        _isFavorite = doctor['isFavorite'] == true;
+        final videoUrl = _text(doctor['videoUrl']);
+        if (videoUrl.isNotEmpty) _videoUrl = videoUrl;
+      });
     } catch (_) {
       // Keep the local default if the profile detail request fails.
+    }
+  }
+
+  Future<void> _openVideoLink() async {
+    final url = _text(_videoUrl);
+    final uri = Uri.tryParse(url);
+    if (uri == null || !uri.hasScheme) return;
+
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!launched && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open video link')),
+      );
     }
   }
 
@@ -140,7 +162,8 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                                   ? const Color(0xFFD4822A)
                                   : const Color(0xFFFBF6EC),
                             ),
-                            onPressed: _isFavoriteLoading ? null : _toggleFavorite,
+                            onPressed:
+                                _isFavoriteLoading ? null : _toggleFavorite,
                           ),
                         ),
                       ],
@@ -525,89 +548,75 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                         const SizedBox(height: 16),
 
                         // Video Intro
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFBF6EC),
-                            border: Border.all(color: const Color(0xFFEFE2CC)),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Column(
-                            children: [
-                              Container(
-                                height: 160,
-                                width: double.infinity,
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [
-                                      const Color(0xFFEFE2CC),
-                                      const Color(0xFFD4822A).withOpacity(0.2),
+                        InkWell(
+                          onTap:
+                              _text(_videoUrl).isEmpty ? null : _openVideoLink,
+                          borderRadius: BorderRadius.circular(14),
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFBF6EC),
+                              border:
+                                  Border.all(color: const Color(0xFFEFE2CC)),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF3B1F0A),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.play_arrow,
+                                    color: Color(0xFFFBF6EC),
+                                    size: 28,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        _text(_videoUrl).isEmpty
+                                            ? 'No YouTube introduction link added'
+                                            : "Doctor's YouTube introduction",
+                                        style: const TextStyle(
+                                          color: Color(0xFF6B3A1F),
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      if (_text(_videoUrl).isNotEmpty) ...[
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          _text(_videoUrl),
+                                          style: const TextStyle(
+                                            color: Color(0xFFA0622A),
+                                            fontSize: 12,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
                                     ],
                                   ),
-                                  borderRadius: BorderRadius.circular(12),
                                 ),
-                                child: Stack(
-                                  alignment: Alignment.center,
-                                  children: [
-                                    Container(
-                                      width: 56,
-                                      height: 56,
-                                      decoration: const BoxDecoration(
-                                        color: Color(0xFF3B1F0A),
-                                        shape: BoxShape.circle,
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black26,
-                                            blurRadius: 10,
-                                            offset: Offset(0, 4),
-                                          ),
-                                        ],
-                                      ),
-                                      alignment: Alignment.center,
-                                      child: const Icon(
-                                        Icons.play_arrow,
-                                        color: Color(0xFFFBF6EC),
-                                        size: 32,
-                                      ),
-                                    ),
-                                    Positioned(
-                                      top: 12,
-                                      right: 12,
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 4,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Colors.black.withOpacity(0.3),
-                                          borderRadius: BorderRadius.circular(
-                                            20,
-                                          ),
-                                        ),
-                                        child: const Text(
-                                          '2:00',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 10,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              const Text(
-                                "Watch doctor's clinical introduction",
-                                style: TextStyle(
-                                  color: Color(0xFF6B3A1F),
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
+                                if (_text(_videoUrl).isNotEmpty) ...[
+                                  const SizedBox(width: 8),
+                                  const Icon(
+                                    Icons.open_in_new,
+                                    color: Color(0xFFA0622A),
+                                    size: 18,
+                                  ),
+                                ],
+                              ],
+                            ),
                           ),
                         ),
 
@@ -788,5 +797,11 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
         ],
       ),
     );
+  }
+
+  String _text(dynamic value, [String fallback = '']) {
+    if (value == null) return fallback;
+    final text = value.toString().trim();
+    return text.isEmpty ? fallback : text;
   }
 }

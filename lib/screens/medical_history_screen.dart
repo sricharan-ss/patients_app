@@ -226,6 +226,7 @@ class AppointmentHistoryScreen extends StatelessWidget {
     return _HistoryRecordsPage(
       title: 'Appointment History',
       searchHint: 'Search appointments...',
+      showPdfActions: false,
       loader: () async {
         final appointments = await PatientApiService.getAppointments();
         return appointments.map((appointment) {
@@ -247,11 +248,13 @@ class _HistoryRecordsPage extends StatefulWidget {
     required this.title,
     required this.searchHint,
     required this.loader,
+    this.showPdfActions = true,
   });
 
   final String title;
   final String searchHint;
   final Future<List<_HistoryRecord>> Function() loader;
+  final bool showPdfActions;
 
   @override
   State<_HistoryRecordsPage> createState() => _HistoryRecordsPageState();
@@ -368,7 +371,10 @@ class _HistoryRecordsPageState extends State<_HistoryRecordsPage> {
                     separatorBuilder: (_, __) => const SizedBox(height: 10),
                     itemBuilder: (context, index) {
                       final record = filtered[index];
-                      return _HistoryRecordCard(record: record);
+                      return _HistoryRecordCard(
+                        record: record,
+                        showPdfActions: widget.showPdfActions,
+                      );
                     },
                   );
                 },
@@ -524,9 +530,13 @@ class _HistoryCategoryCard extends StatelessWidget {
 }
 
 class _HistoryRecordCard extends StatelessWidget {
-  const _HistoryRecordCard({required this.record});
+  const _HistoryRecordCard({
+    required this.record,
+    required this.showPdfActions,
+  });
 
   final _HistoryRecord record;
+  final bool showPdfActions;
 
   Future<void> _showPdfLink(BuildContext context) async {
     final pdfUrl = (record.pdfUrl ?? '').trim();
@@ -602,16 +612,19 @@ class _HistoryRecordCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const SizedBox(width: 10),
-              IconButton(
-                onPressed: hasPdf ? () => _showPdfLink(context) : null,
-                icon: const Icon(Icons.file_download_outlined, size: 20),
-                color: AppColors.accent,
-                disabledColor: AppColors.brownLight,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-                splashRadius: 20,
-              ),
+              if (showPdfActions) ...[
+                const SizedBox(width: 10),
+                IconButton(
+                  onPressed: hasPdf ? () => _showPdfLink(context) : null,
+                  icon: const Icon(Icons.file_download_outlined, size: 20),
+                  color: AppColors.accent,
+                  disabledColor: AppColors.brownLight,
+                  padding: EdgeInsets.zero,
+                  constraints:
+                      const BoxConstraints(minWidth: 24, minHeight: 24),
+                  splashRadius: 20,
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 2),
@@ -642,17 +655,18 @@ class _HistoryRecordCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              GestureDetector(
-                onTap: hasPdf ? () => _showPdfLink(context) : null,
-                child: Text(
-                  hasPdf ? 'PDF link +' : 'PDF not uploaded',
-                  style: TextStyle(
-                    color: hasPdf ? AppColors.accent : AppColors.brownLight,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
+              if (showPdfActions)
+                GestureDetector(
+                  onTap: hasPdf ? () => _showPdfLink(context) : null,
+                  child: Text(
+                    hasPdf ? 'PDF link +' : 'PDF not uploaded',
+                    style: TextStyle(
+                      color: hasPdf ? AppColors.accent : AppColors.brownLight,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
         ],

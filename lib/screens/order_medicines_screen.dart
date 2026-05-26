@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../core/app_colors.dart';
@@ -20,6 +22,7 @@ class OrderMedicinesScreen extends StatefulWidget {
 class _OrderMedicinesScreenState extends State<OrderMedicinesScreen> {
   final TextEditingController _searchController = TextEditingController();
   final Map<String, int> _cart = {};
+  Timer? _searchDebounce;
   List<Map<String, dynamic>> _medicines = const [];
   String _searchQuery = '';
   bool _isLoading = true;
@@ -48,14 +51,17 @@ class _OrderMedicinesScreenState extends State<OrderMedicinesScreen> {
     });
   }
 
-  Future<void> _loadMedicines() async {
+  Future<void> _loadMedicines({String? query}) async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
-      final medicines = await PatientApiService.getOrderableMedicines();
+      final medicines = await PatientApiService.getOrderableMedicines(
+        query: query,
+        limit: 80,
+      );
       if (!mounted) return;
       setState(() {
         _medicines = medicines;
@@ -72,8 +78,18 @@ class _OrderMedicinesScreenState extends State<OrderMedicinesScreen> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged(String value) {
+    setState(() => _searchQuery = value);
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) return;
+      _loadMedicines(query: value.trim().isEmpty ? null : value.trim());
+    });
   }
 
   void _updateQuantity(String id, int change) {
@@ -134,8 +150,10 @@ class _OrderMedicinesScreenState extends State<OrderMedicinesScreen> {
             'prescriptionMedicineId': _text(med['prescriptionMedicineId']),
           'quantity': entry.value,
           if (_text(med['dosage']).isNotEmpty) 'dosage': _text(med['dosage']),
-          if (_text(med['frequency']).isNotEmpty) 'frequency': _text(med['frequency']),
-          if (_toInt(med['durationDays']) > 0) 'durationDays': _toInt(med['durationDays']),
+          if (_text(med['frequency']).isNotEmpty)
+            'frequency': _text(med['frequency']),
+          if (_toInt(med['durationDays']) > 0)
+            'durationDays': _toInt(med['durationDays']),
           if (_toDouble(med['price']) > 0) 'unitPrice': _toDouble(med['price']),
         };
       }).toList();
@@ -201,11 +219,13 @@ class _OrderMedicinesScreenState extends State<OrderMedicinesScreen> {
                 children: [
                   TextField(
                     controller: _searchController,
-                    onChanged: (value) => setState(() => _searchQuery = value),
+                    onChanged: _onSearchChanged,
                     decoration: InputDecoration(
                       hintText: 'Search medicines...',
-                      hintStyle: TextStyle(color: AppColors.brownMid.withOpacity(0.5)),
-                      prefixIcon: const Icon(Icons.search, color: AppColors.brownMid),
+                      hintStyle:
+                          TextStyle(color: AppColors.brownMid.withOpacity(0.5)),
+                      prefixIcon:
+                          const Icon(Icons.search, color: AppColors.brownMid),
                       filled: true,
                       fillColor: AppColors.cream,
                       contentPadding: const EdgeInsets.symmetric(vertical: 14),
@@ -236,7 +256,9 @@ class _OrderMedicinesScreenState extends State<OrderMedicinesScreen> {
                   if (_isLoading)
                     const Padding(
                       padding: EdgeInsets.only(top: 40),
-                      child: Center(child: CircularProgressIndicator(color: AppColors.accent)),
+                      child: Center(
+                          child: CircularProgressIndicator(
+                              color: AppColors.accent)),
                     )
                   else if (_errorMessage != null)
                     Container(
@@ -248,7 +270,8 @@ class _OrderMedicinesScreenState extends State<OrderMedicinesScreen> {
                       ),
                       child: Text(
                         _errorMessage!,
-                        style: const TextStyle(color: AppColors.brownMid, fontSize: 13),
+                        style: const TextStyle(
+                            color: AppColors.brownMid, fontSize: 13),
                       ),
                     )
                   else if (items.isEmpty)
@@ -261,7 +284,8 @@ class _OrderMedicinesScreenState extends State<OrderMedicinesScreen> {
                       ),
                       child: const Text(
                         'No medicines match your search.',
-                        style: TextStyle(color: AppColors.brownMid, fontSize: 13),
+                        style:
+                            TextStyle(color: AppColors.brownMid, fontSize: 13),
                       ),
                     ),
                   ...items.map((item) {
@@ -336,7 +360,8 @@ class _OrderMedicinesScreenState extends State<OrderMedicinesScreen> {
                                     onPressed: () => _updateQuantity(id, 1),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: AppColors.brownDeep,
-                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 12),
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(12),
                                       ),
@@ -430,8 +455,10 @@ class _OrderMedicinesScreenState extends State<OrderMedicinesScreen> {
                         width: double.infinity,
                         child: ElevatedButton.icon(
                           onPressed: _isSubmitting ? null : _placeOrder,
-                          icon: const Icon(Icons.shopping_cart_outlined, size: 20),
-                          label: Text(_isSubmitting ? 'Placing...' : 'Place Order'),
+                          icon: const Icon(Icons.shopping_cart_outlined,
+                              size: 20),
+                          label: Text(
+                              _isSubmitting ? 'Placing...' : 'Place Order'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.brownDeep,
                             foregroundColor: AppColors.cream,

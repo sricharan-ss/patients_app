@@ -333,6 +333,7 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
                             totalPatients: d.totalPatients,
                             experience: d.experience,
                             fee: d.fee,
+                            videoUrl: d.videoUrl,
                             aiPick: i < 2,
                           );
                         },
@@ -544,6 +545,7 @@ class _DoctorCard extends StatelessWidget {
     required this.totalPatients,
     required this.experience,
     required this.fee,
+    required this.videoUrl,
     required this.aiPick,
   });
 
@@ -557,6 +559,7 @@ class _DoctorCard extends StatelessWidget {
   final int totalPatients;
   final int experience;
   final int fee;
+  final String? videoUrl;
   final bool aiPick;
 
   @override
@@ -576,6 +579,7 @@ class _DoctorCard extends StatelessWidget {
               experience: experience,
               totalPatients: totalPatients,
               fee: fee,
+              videoUrl: videoUrl,
               aiRecommended: aiPick,
             ),
           ),

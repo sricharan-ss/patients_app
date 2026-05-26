@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/session_store.dart';
+import '../services/patient_api_service.dart';
 import 'my_information_screen.dart';
 import 'order_history_screen.dart';
 import 'secure_vault_screen.dart';
@@ -12,12 +13,54 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  String _orderPreview = 'Loading...';
+  String _vaultPreview = 'Loading...';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfileCounts();
+  }
+
+  Future<void> _loadProfileCounts() async {
+    try {
+      final results = await Future.wait<dynamic>([
+        PatientApiService.getMedicationOrders(limit: 100),
+        PatientApiService.getRecords(),
+      ]);
+      final orders = results[0] as List<Map<String, dynamic>>;
+      final records = results[1] as PatientRecords;
+      if (!mounted) return;
+      setState(() {
+        _orderPreview = _countLabel(orders.length, 'order');
+        _vaultPreview = '${_countLabel(records.vault.length, 'file')} stored';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _orderPreview = 'Unable to load';
+        _vaultPreview = 'Unable to load';
+      });
+    }
+  }
+
+  String _countLabel(int count, String singular) {
+    final noun = count == 1 ? singular : '${singular}s';
+    return '$count $noun';
+  }
+
   @override
   Widget build(BuildContext context) {
     final fullName = SessionStore.fullName;
     final profileInitial = SessionStore.profileInitial;
     final email = SessionStore.email.isEmpty ? 'Not set' : SessionStore.email;
     final phoneNumber = SessionStore.phoneNumber;
+    final agePreview = SessionStore.ageLabel.isNotEmpty
+        ? '${SessionStore.ageLabel} years'
+        : 'Age not set';
+    final bloodPreview = SessionStore.bloodGroupLabel.isNotEmpty
+        ? SessionStore.bloodGroupLabel
+        : 'Blood Group not set';
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -34,7 +77,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               // Profile Header
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 32),
+                padding: const EdgeInsets.only(
+                    left: 16, right: 16, top: 16, bottom: 32),
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
@@ -68,7 +112,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       alignment: Alignment.center,
                       child: Text(
                         profileInitial,
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: Color(0xFFFBF6EC),
                           fontSize: 28,
                           fontWeight: FontWeight.w500,
@@ -78,7 +122,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 12),
                     Text(
                       fullName,
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: Color(0xFFFBF6EC),
                         fontSize: 20,
                         fontWeight: FontWeight.w500,
@@ -105,19 +149,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       _buildSectionCard(
                         context,
                         title: 'My Information',
-                        preview: '${SessionStore.ageLabel.isNotEmpty ? SessionStore.ageLabel + " years" : "Age not set"} • ${SessionStore.bloodGroupLabel.isNotEmpty ? SessionStore.bloodGroupLabel : "Blood Group not set"}',
+                        preview: '$agePreview - $bloodPreview',
                         icon: Icons.person_outline,
                         onTap: () async {
                           await Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (_) => const MyInformationScreen()),
+                            MaterialPageRoute(
+                                builder: (_) => const MyInformationScreen()),
                           );
                           if (mounted) setState(() {});
                         },
                         isInformation: true,
                         details: [
-                          {'label': 'Age', 'value': SessionStore.ageLabel.isNotEmpty ? '${SessionStore.ageLabel} years' : 'Not set'},
-                          {'label': 'Gender', 'value': SessionStore.genderLabel.isNotEmpty ? SessionStore.genderLabel : 'Not set'},
+                          {
+                            'label': 'Age',
+                            'value': SessionStore.ageLabel.isNotEmpty
+                                ? '${SessionStore.ageLabel} years'
+                                : 'Not set'
+                          },
+                          {
+                            'label': 'Gender',
+                            'value': SessionStore.genderLabel.isNotEmpty
+                                ? SessionStore.genderLabel
+                                : 'Not set'
+                          },
                           {'label': 'Phone', 'value': phoneNumber},
                           {'label': 'Email', 'value': email},
                         ],
@@ -126,13 +181,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       _buildSectionCard(
                         context,
                         title: 'Order History',
-                        preview: '2 orders',
+                        preview: _orderPreview,
                         icon: Icons.inventory_2_outlined,
-                        onTap: () {
-                          Navigator.push(
+                        onTap: () async {
+                          await Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (_) => const OrderHistoryScreen()),
+                            MaterialPageRoute(
+                                builder: (_) => const OrderHistoryScreen()),
                           );
+                          if (mounted) _loadProfileCounts();
                         },
                       ),
                       const SizedBox(height: 12),
@@ -141,13 +198,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       _buildSectionCard(
                         context,
                         title: 'Secure Vault',
-                        preview: '8 files stored',
+                        preview: _vaultPreview,
                         icon: Icons.lock_outline,
-                        onTap: () {
-                          Navigator.push(
+                        onTap: () async {
+                          await Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (_) => const SecureVaultScreen()),
+                            MaterialPageRoute(
+                                builder: (_) => const SecureVaultScreen()),
                           );
+                          if (mounted) _loadProfileCounts();
                         },
                       ),
                     ],
@@ -220,7 +279,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right, color: Color(0xFFA0622A), size: 20),
+                const Icon(Icons.chevron_right,
+                    color: Color(0xFFA0622A), size: 20),
               ],
             ),
             if (isInformation && details != null) ...[

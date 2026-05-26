@@ -68,8 +68,8 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
     final cart = <String, int>{};
     for (final item in items) {
       final id = _text(
-        item['prescriptionMedicineId'],
-        _text(item['medicineId']),
+        item['medicineId'],
+        _text(item['prescriptionMedicineId']),
       );
       if (id.isEmpty) continue;
       cart[id] = (cart[id] ?? 0) + (int.tryParse(_text(item['quantity'])) ?? 1);
