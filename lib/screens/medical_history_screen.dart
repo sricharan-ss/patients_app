@@ -172,16 +172,34 @@ class PrescriptionsScreen extends StatelessWidget {
               encounter is Map<String, dynamic> ? encounter['doctor'] : null;
           final hospital =
               encounter is Map<String, dynamic> ? encounter['hospital'] : null;
+          final medicines = ((item['medicines'] as List?) ?? const [])
+              .whereType<Map>()
+              .map((entry) => entry.map((k, v) => MapEntry(k.toString(), v)))
+              .toList();
           return _HistoryRecord(
             primary: _nestedString(doctor, 'name', 'Prescription'),
-            secondary:
-                '${(item['medicines'] as List?)?.length ?? 0} medicine(s)',
+            secondary: medicines.isEmpty
+                ? 'No medicine lines recorded'
+                : '${medicines.length} medicine(s) prescribed',
             source: _nestedString(hospital, 'name', 'VITADATA'),
             date: _formatDate(
               item['generatedAt'] ??
                   (encounter is Map ? encounter['scheduledTime'] : null),
             ),
             pdfUrl: item['pdfUrl']?.toString(),
+            details: medicines
+                .map(
+                  (medicine) => [
+                    _text(medicine['name'], 'Medicine'),
+                    if (_text(medicine['dosage']).isNotEmpty)
+                      _text(medicine['dosage']),
+                    if (_text(medicine['frequency']).isNotEmpty)
+                      _text(medicine['frequency']),
+                    if (medicine['durationDays'] != null)
+                      '${medicine['durationDays']} day(s)',
+                  ].join(' • ')
+                )
+                .toList(),
           );
         }).toList();
       },
@@ -203,14 +221,23 @@ class LabReportsScreen extends StatelessWidget {
           final encounter = item['encounter'];
           final hospital =
               encounter is Map<String, dynamic> ? encounter['hospital'] : null;
+          final resultValue = _text(item['resultValue']);
+          final remarks = _text(item['remarks']);
+          final isAbnormal = item['isAbnormal'] == true;
           return _HistoryRecord(
             primary: item['testName']?.toString() ?? 'Lab report',
-            secondary: item['remarks']?.toString() ??
-                item['resultValue']?.toString() ??
-                'Uploaded',
+            secondary: resultValue.isNotEmpty
+                ? 'Result: $resultValue'
+                : (remarks.isNotEmpty ? remarks : 'Uploaded'),
             source: _nestedString(hospital, 'name', 'VITADATA Lab'),
             date: _formatDate(item['reportedAt']),
             pdfUrl: item['pdfUrl']?.toString(),
+            details: [
+              if (resultValue.isNotEmpty) 'Parameter: ${_text(item['testName'])}',
+              if (resultValue.isNotEmpty) 'Value: $resultValue',
+              if (remarks.isNotEmpty) 'Remarks: $remarks',
+              if (isAbnormal) 'Flag: Abnormal',
+            ],
           );
         }).toList();
       },
@@ -236,6 +263,10 @@ class AppointmentHistoryScreen extends StatelessWidget {
             source: appointment.hospital?.name ?? 'VITADATA Hospital',
             date: _formatDate(appointment.scheduledTime),
             pdfUrl: null,
+            details: [
+              if ((appointment.reason ?? '').trim().isNotEmpty)
+                'Reason: ${appointment.reason!.trim()}',
+            ],
           );
         }).toList();
       },
@@ -354,7 +385,7 @@ class _HistoryRecordsPageState extends State<_HistoryRecordsPage> {
                   final filtered = (snapshot.data ?? const <_HistoryRecord>[])
                       .where((record) {
                     final text =
-                        '${record.primary} ${record.secondary} ${record.source}'
+                        '${record.primary} ${record.secondary} ${record.source} ${record.details.join(' ')}'
                             .toLowerCase();
                     return text.contains(normalized);
                   }).toList();
@@ -587,6 +618,7 @@ class _HistoryRecordCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasPdf = (record.pdfUrl ?? '').trim().isNotEmpty;
+    final canShowPdfActions = showPdfActions && hasPdf;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -612,13 +644,12 @@ class _HistoryRecordCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              if (showPdfActions) ...[
+              if (canShowPdfActions) ...[
                 const SizedBox(width: 10),
                 IconButton(
-                  onPressed: hasPdf ? () => _showPdfLink(context) : null,
+                  onPressed: () => _showPdfLink(context),
                   icon: const Icon(Icons.file_download_outlined, size: 20),
                   color: AppColors.accent,
-                  disabledColor: AppColors.brownLight,
                   padding: EdgeInsets.zero,
                   constraints:
                       const BoxConstraints(minWidth: 24, minHeight: 24),
@@ -631,9 +662,26 @@ class _HistoryRecordCard extends StatelessWidget {
           Text(
             record.secondary,
             style: const TextStyle(color: AppColors.brownMid, fontSize: 13),
-            maxLines: 1,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
+          if (record.details.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            ...record.details.map(
+              (detail) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(
+                  detail,
+                  style: const TextStyle(
+                    color: AppColors.brownMid,
+                    fontSize: 12,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 2),
           Text(
             record.source,
@@ -655,13 +703,13 @@ class _HistoryRecordCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              if (showPdfActions)
+              if (canShowPdfActions)
                 GestureDetector(
-                  onTap: hasPdf ? () => _showPdfLink(context) : null,
-                  child: Text(
-                    hasPdf ? 'PDF link +' : 'PDF not uploaded',
+                  onTap: () => _showPdfLink(context),
+                  child: const Text(
+                    'PDF link +',
                     style: TextStyle(
-                      color: hasPdf ? AppColors.accent : AppColors.brownLight,
+                      color: AppColors.accent,
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
                     ),
@@ -682,6 +730,7 @@ class _HistoryRecord {
     required this.source,
     required this.date,
     required this.pdfUrl,
+    this.details = const [],
   });
 
   final String primary;
@@ -689,4 +738,11 @@ class _HistoryRecord {
   final String source;
   final String date;
   final String? pdfUrl;
+  final List<String> details;
+}
+
+String _text(dynamic value, [String fallback = '']) {
+  if (value == null) return fallback;
+  final text = value.toString().trim();
+  return text.isEmpty ? fallback : text;
 }

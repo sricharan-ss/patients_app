@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import '../core/app_colors.dart';
 import '../core/session_store.dart';
+import '../services/medication_notification_service.dart';
 import '../services/patient_api_service.dart';
 import '../screens/doctor_profile_screen.dart';
 import '../screens/hospital_detail_screen.dart';
@@ -177,11 +179,31 @@ class _HomeTabState extends State<_HomeTab> {
   List<PatientDoctor> _doctors = <PatientDoctor>[];
   Map<String, dynamic> _medicationDashboard = const {};
   List<Map<String, dynamic>> _recentOrders = const [];
+  Timer? _midnightResetTimer;
 
   @override
   void initState() {
     super.initState();
+    _scheduleMidnightReset();
     _loadHomeData();
+  }
+
+  @override
+  void dispose() {
+    _midnightResetTimer?.cancel();
+    super.dispose();
+  }
+
+  void _scheduleMidnightReset() {
+    _midnightResetTimer?.cancel();
+    final now = DateTime.now();
+    final tomorrow = DateTime(now.year, now.month, now.day + 1);
+    final delay = tomorrow.difference(now) + const Duration(seconds: 2);
+    _midnightResetTimer = Timer(delay, () {
+      if (!mounted) return;
+      _loadHomeData();
+      _scheduleMidnightReset();
+    });
   }
 
   @override
@@ -208,12 +230,20 @@ class _HomeTabState extends State<_HomeTab> {
         PatientApiService.getMedicationOrders(limit: 1),
       ]);
 
+      final medicationDashboard = results[3] as Map<String, dynamic>;
+      final schedule = _mapList(medicationDashboard['todaySchedule']);
+      try {
+        await MedicationNotificationService.syncMedicationReminders(schedule);
+      } catch (_) {
+        // Home data should continue rendering even if local reminder sync fails.
+      }
+
       if (!mounted) return;
       setState(() {
         _appointments = results[0] as List<PatientAppointment>;
         _hospitals = results[1] as List<PatientHospital>;
         _doctors = results[2] as List<PatientDoctor>;
-        _medicationDashboard = results[3] as Map<String, dynamic>;
+        _medicationDashboard = medicationDashboard;
         _recentOrders = results[4] as List<Map<String, dynamic>>;
         _isLoading = false;
       });
