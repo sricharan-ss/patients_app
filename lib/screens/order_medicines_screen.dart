@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 
 import '../core/app_colors.dart';
+import '../core/session_store.dart';
 import '../services/patient_api_service.dart';
 
 class OrderMedicinesScreen extends StatefulWidget {
@@ -28,10 +30,17 @@ class _OrderMedicinesScreenState extends State<OrderMedicinesScreen> {
   bool _isLoading = true;
   bool _isSubmitting = false;
   String? _errorMessage;
+  late final Razorpay _razorpay;
+  String? _pendingMedicationOrderId;
+  String? _pendingPaymentId;
 
   @override
   void initState() {
     super.initState();
+    _razorpay = Razorpay();
+    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
+    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
+    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
     if (widget.initialCart != null) {
       _cart.addAll(widget.initialCart!);
     }
@@ -80,6 +89,7 @@ class _OrderMedicinesScreenState extends State<OrderMedicinesScreen> {
   void dispose() {
     _searchDebounce?.cancel();
     _searchController.dispose();
+    _razorpay.clear();
     super.dispose();
   }
 
@@ -162,18 +172,115 @@ class _OrderMedicinesScreenState extends State<OrderMedicinesScreen> {
         (item) => _cart.containsKey(_text(item['id'])),
         orElse: () => const <String, dynamic>{},
       );
-      await PatientApiService.createMedicationOrder(
+      final medicationOrder = await PatientApiService.createMedicationOrder(
         hospitalId: _text(first['hospitalId']),
         sourcePrescriptionId: _text(first['prescriptionId']),
         orderType: widget.initialOrderId == null ? 'NEW' : 'REORDER',
         items: items,
       );
 
+      final medicationOrderId = _text(medicationOrder['id']);
+      if (medicationOrderId.isEmpty) {
+        throw const PatientApiException('Could not create medication order.');
+      }
+
+      final paymentData =
+          await PatientApiService.createMedicationOrderPayment(medicationOrderId);
+      final razorpayOrder = _toMap(paymentData['order']);
+      final keyId = _text(paymentData['keyId']);
+      final paymentId = _text(paymentData['paymentId']);
+      final razorpayOrderId = _text(razorpayOrder['id']);
+      final amount = _toInt(razorpayOrder['amount']);
+
+      if (keyId.isEmpty || paymentId.isEmpty || razorpayOrderId.isEmpty || amount <= 0) {
+        throw const PatientApiException('Could not start Razorpay checkout.');
+      }
+
+      _pendingMedicationOrderId = medicationOrderId;
+      _pendingPaymentId = paymentId;
+      _openRazorpayCheckout(
+        keyId: keyId,
+        razorpayOrderId: razorpayOrderId,
+        amount: amount,
+      );
+    } catch (error) {
       if (!mounted) return;
-      setState(_cart.clear);
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(PatientApiService.friendlyError(error))),
+      );
+    }
+  }
+
+  void _openRazorpayCheckout({
+    required String keyId,
+    required String razorpayOrderId,
+    required int amount,
+  }) {
+    final options = {
+      'key': keyId,
+      'amount': amount,
+      'currency': 'INR',
+      'name': 'VITADATA',
+      'description': 'Medicine order',
+      'order_id': razorpayOrderId,
+      'prefill': {
+        'contact': SessionStore.phoneNumber,
+        'email': SessionStore.email,
+        'name': SessionStore.fullName,
+      },
+      'theme': {'color': '#3B1F0A'},
+    };
+
+    try {
+      _razorpay.open(options);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not open Razorpay checkout: $error')),
+      );
+    }
+  }
+
+  Future<void> _handlePaymentSuccess(PaymentSuccessResponse response) async {
+    final orderId = _pendingMedicationOrderId;
+    final paymentId = _pendingPaymentId;
+    final razorpayPaymentId = response.paymentId;
+    final razorpayOrderId = response.orderId;
+    final signature = response.signature;
+
+    if (orderId == null ||
+        paymentId == null ||
+        razorpayPaymentId == null ||
+        razorpayOrderId == null ||
+        signature == null) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Payment details were incomplete.')),
+      );
+      return;
+    }
+
+    try {
+      await PatientApiService.verifyMedicationOrderPayment(
+        orderId: orderId,
+        paymentId: paymentId,
+        razorpayPaymentId: razorpayPaymentId,
+        razorpayOrderId: razorpayOrderId,
+        razorpaySignature: signature,
+      );
+      if (!mounted) return;
+      setState(() {
+        _cart.clear();
+        _isSubmitting = false;
+        _pendingMedicationOrderId = null;
+        _pendingPaymentId = null;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Order placed successfully'),
+          content: Text('Payment successful. Order confirmed.'),
           backgroundColor: AppColors.brownDeep,
           behavior: SnackBarBehavior.floating,
         ),
@@ -181,12 +288,28 @@ class _OrderMedicinesScreenState extends State<OrderMedicinesScreen> {
       Navigator.pop(context);
     } catch (error) {
       if (!mounted) return;
+      setState(() => _isSubmitting = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(PatientApiService.friendlyError(error))),
       );
-    } finally {
-      if (mounted) setState(() => _isSubmitting = false);
     }
+  }
+
+  void _handlePaymentError(PaymentFailureResponse response) {
+    if (!mounted) return;
+    setState(() => _isSubmitting = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(response.message ?? 'Payment was not completed.'),
+      ),
+    );
+  }
+
+  void _handleExternalWallet(ExternalWalletResponse response) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('External wallet: ${response.walletName ?? 'selected'}')),
+    );
   }
 
   @override
@@ -494,6 +617,11 @@ class _OrderMedicinesScreenState extends State<OrderMedicinesScreen> {
   double _toDouble(dynamic value, [double fallback = 0]) {
     if (value is num) return value.toDouble();
     return double.tryParse(value?.toString() ?? '') ?? fallback;
+  }
+
+  Map<String, dynamic> _toMap(dynamic value) {
+    if (value is! Map) return const {};
+    return value.map((key, val) => MapEntry(key.toString(), val));
   }
 }
 
