@@ -210,17 +210,14 @@ class PatientApiService {
   }
 
   static Future<Map<String, dynamic>> createMedicationSchedule({
-    String? medicineId,
-    required String medicineName,
+    required String medicineId,
     required int quantity,
     required String timeOfDay,
     int frequencyPerDay = 1,
     String? instructions,
   }) {
     return _postMap('/api/mobile/patient/medications/schedules', {
-      if (medicineId != null && medicineId.trim().isNotEmpty)
-        'medicineId': medicineId.trim(),
-      if (medicineName.trim().isNotEmpty) 'medicineName': medicineName.trim(),
+      'medicineId': medicineId.trim(),
       'quantity': quantity,
       'timeOfDay': timeOfDay,
       'frequencyPerDay': frequencyPerDay,
@@ -232,7 +229,6 @@ class PatientApiService {
   static Future<Map<String, dynamic>> updateMedicationSchedule({
     required String scheduleId,
     String? medicineId,
-    String? medicineName,
     int? quantity,
     String? timeOfDay,
     int? frequencyPerDay,
@@ -241,7 +237,6 @@ class PatientApiService {
     return _patchMap('/api/mobile/patient/medications/schedules/$scheduleId', {
       if (medicineId != null && medicineId.trim().isNotEmpty)
         'medicineId': medicineId.trim(),
-      if (medicineName != null) 'medicineName': medicineName.trim(),
       if (quantity != null) 'quantity': quantity,
       if (timeOfDay != null) 'timeOfDay': timeOfDay,
       if (frequencyPerDay != null) 'frequencyPerDay': frequencyPerDay,

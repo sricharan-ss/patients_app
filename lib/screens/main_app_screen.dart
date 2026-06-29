@@ -141,7 +141,7 @@ class _MainAppScreenState extends State<MainAppScreen> {
           ),
           const MedicationsScreen(),
           const MedicalHistoryScreen(),
-          const ProfileScreen(),
+          ProfileScreen(onBack: () => setState(() => _selectedIndex = 0)),
         ],
       ),
       bottomNavigationBar: _BottomNav(

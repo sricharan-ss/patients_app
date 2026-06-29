@@ -6,7 +6,9 @@ import 'order_history_screen.dart';
 import 'secure_vault_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  const ProfileScreen({super.key, this.onBack});
+
+  final VoidCallback? onBack;
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -47,6 +49,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _countLabel(int count, String singular) {
     final noun = count == 1 ? singular : '${singular}s';
     return '$count $noun';
+  }
+
+  void _handleBack() {
+    if (widget.onBack != null) {
+      widget.onBack!();
+      return;
+    }
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
   }
 
   @override
@@ -96,7 +108,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       alignment: Alignment.topLeft,
                       child: IconButton(
                         icon: const Icon(Icons.arrow_back, color: Colors.white),
-                        onPressed: () => Navigator.of(context).pop(),
+                        onPressed: _handleBack,
                         padding: EdgeInsets.zero,
                         alignment: Alignment.topLeft,
                       ),

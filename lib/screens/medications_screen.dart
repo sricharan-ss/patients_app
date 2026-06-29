@@ -189,9 +189,32 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
   Future<void> _showScheduleForm([Map<String, dynamic>? schedule]) async {
     final existingSchedule = schedule;
     final editing = existingSchedule != null;
-    final nameController = TextEditingController(
-      text: existingSchedule == null ? '' : _text(existingSchedule['medicineName']),
-    );
+    var medicineCatalog = <Map<String, dynamic>>[];
+    try {
+      medicineCatalog = await PatientApiService.getOrderableMedicines(limit: 100);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(PatientApiService.friendlyError(error))),
+      );
+      return;
+    }
+
+    var selectedMedicineId = existingSchedule == null
+        ? ''
+        : _text(existingSchedule['medicineId']);
+    if (selectedMedicineId.isNotEmpty &&
+        !medicineCatalog.any((item) => _text(item['medicineId']) == selectedMedicineId)) {
+      medicineCatalog = [
+        {
+          'medicineId': selectedMedicineId,
+          'name': _text(existingSchedule!['medicineName'], 'Medicine'),
+          'type': _text(existingSchedule['dosage']),
+        },
+        ...medicineCatalog,
+      ];
+    }
+
     final quantityController = TextEditingController(
       text: existingSchedule == null
           ? '1'
@@ -216,12 +239,11 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
         return StatefulBuilder(
           builder: (context, setSheetState) {
             Future<void> save() async {
-              final name = nameController.text.trim();
               final quantity = int.tryParse(quantityController.text.trim()) ?? 1;
               var closeSheet = false;
-              if (name.isEmpty) {
+              if (selectedMedicineId.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Medicine name is required')),
+                  const SnackBar(content: Text('Select a medicine from the catalog')),
                 );
                 return;
               }
@@ -232,14 +254,14 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
                 if (existingSchedule != null) {
                   await PatientApiService.updateMedicationSchedule(
                     scheduleId: _text(existingSchedule['id']),
-                    medicineName: name,
+                    medicineId: selectedMedicineId,
                     quantity: quantity,
                     timeOfDay: timeText,
                     instructions: instructionsController.text,
                   );
                 } else {
                   await PatientApiService.createMedicationSchedule(
-                    medicineName: name,
+                    medicineId: selectedMedicineId,
                     quantity: quantity,
                     timeOfDay: timeText,
                     instructions: instructionsController.text,
@@ -281,10 +303,27 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  TextField(
-                    controller: nameController,
-                    textInputAction: TextInputAction.next,
-                    decoration: _inputDecoration('Medicine name'),
+                  DropdownButtonFormField<String>(
+                    value: selectedMedicineId.isEmpty ? null : selectedMedicineId,
+                    isExpanded: true,
+                    decoration: _inputDecoration('Medicine'),
+                    items: medicineCatalog.map((medicine) {
+                      final id = _text(medicine['medicineId'], _text(medicine['id']));
+                      final name = _text(medicine['name'], 'Medicine');
+                      final type = _text(medicine['type']);
+                      return DropdownMenuItem<String>(
+                        value: id,
+                        child: Text(
+                          type.isEmpty ? name : '$name - $type',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: isSaving
+                        ? null
+                        : (value) {
+                            setSheetState(() => selectedMedicineId = value ?? '');
+                          },
                   ),
                   const SizedBox(height: 12),
                   Row(
@@ -342,7 +381,6 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
       },
     );
 
-    nameController.dispose();
     quantityController.dispose();
     instructionsController.dispose();
   }
