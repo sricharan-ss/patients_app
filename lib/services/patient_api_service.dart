@@ -283,6 +283,30 @@ class PatientApiService {
         '/api/mobile/patient/medications/orders/$orderId/cancel', {});
   }
 
+  static Future<Map<String, dynamic>> createMedicationOrderPayment(
+      String orderId) {
+    return _postMap(
+        '/api/mobile/patient/medications/orders/$orderId/payment/order', {});
+  }
+
+  static Future<Map<String, dynamic>> verifyMedicationOrderPayment({
+    required String orderId,
+    required String paymentId,
+    required String razorpayPaymentId,
+    required String razorpayOrderId,
+    required String razorpaySignature,
+  }) {
+    return _postMap(
+      '/api/mobile/patient/medications/orders/$orderId/payment/verify',
+      {
+        'paymentId': paymentId,
+        'razorpayPaymentId': razorpayPaymentId,
+        'razorpayOrderId': razorpayOrderId,
+        'razorpaySignature': razorpaySignature,
+      },
+    );
+  }
+
   static Future<List<Map<String, dynamic>>> getNotifications({
     bool unreadOnly = false,
     int limit = 50,

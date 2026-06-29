@@ -77,6 +77,20 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
     return cart;
   }
 
+  Color _statusBackground(String status) {
+    if (status == 'DELIVERED') return const Color(0xFFD5F2DE);
+    if (status == 'CANCELLED') return const Color(0xFFFFE0E0);
+    if (status == 'DISPATCHED') return const Color(0xFFE3F2FD);
+    return const Color(0xFFF7E4BE);
+  }
+
+  Color _statusTextColor(String status) {
+    if (status == 'DELIVERED') return const Color(0xFF2E7D32);
+    if (status == 'CANCELLED') return const Color(0xFFC62828);
+    if (status == 'DISPATCHED') return const Color(0xFF1565C0);
+    return AppColors.accent;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -153,14 +167,10 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                         itemBuilder: (context, index) {
                           final order = _orders[index];
                           final items = _mapList(order['items']);
-                          final status = _text(order['status'], 'PLACED');
-                          final isDelivered = status == 'DELIVERED';
-                          final statusBg = isDelivered
-                              ? const Color(0xFFD5F2DE)
-                              : const Color(0xFFF7E4BE);
-                          final statusText = isDelivered
-                              ? const Color(0xFF2E7D32)
-                              : AppColors.accent;
+                          final status =
+                              _text(order['status'], 'PLACED').toUpperCase();
+                          final statusBg = _statusBackground(status);
+                          final statusText = _statusTextColor(status);
 
                           return Container(
                             padding: const EdgeInsets.all(16),
@@ -295,8 +305,8 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                                     const SizedBox(width: 10),
                                     Expanded(
                                       child: ElevatedButton.icon(
-                                        onPressed: () {
-                                          Navigator.push(
+                                        onPressed: () async {
+                                          await Navigator.push(
                                             context,
                                             MaterialPageRoute(
                                               builder: (_) =>
@@ -305,6 +315,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                                               ),
                                             ),
                                           );
+                                          if (mounted) _loadOrders();
                                         },
                                         icon: const Icon(
                                             Icons.local_shipping_outlined,

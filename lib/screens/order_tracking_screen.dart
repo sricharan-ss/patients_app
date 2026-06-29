@@ -63,6 +63,13 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
 
   List<Map<String, dynamic>> _buildSteps(String status) {
     final steps = ['PLACED', 'CONFIRMED', 'DISPATCHED', 'DELIVERED'];
+    if (status == 'CANCELLED') {
+      return [
+        {'label': 'Placed', 'completed': true, 'active': false},
+        {'label': 'Cancelled', 'completed': false, 'active': true},
+      ];
+    }
+
     final activeIndex = steps.indexOf(status);
 
     return steps.asMap().entries.map((entry) {
@@ -100,12 +107,20 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         .join(' ');
   }
 
+  Color _statusColor(String status) {
+    if (status == 'DELIVERED') return const Color(0xFF2E7D32);
+    if (status == 'CANCELLED') return const Color(0xFFC62828);
+    if (status == 'DISPATCHED') return const Color(0xFFD4822A);
+    return const Color(0xFF6B3A1F);
+  }
+
   @override
   Widget build(BuildContext context) {
     final status = _text(_order['status'], 'PLACED').toUpperCase();
     final steps = _buildSteps(status);
     final items = _mapList(_order['items']);
     final canCancel = ['DRAFT', 'PLACED', 'CONFIRMED'].contains(status);
+    final statusColor = _statusColor(status);
 
     return Scaffold(
       backgroundColor: const Color(0xFFFFFDF8),
@@ -137,9 +152,12 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                     ),
                   ),
                 )
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
+              : RefreshIndicator(
+                  onRefresh: _loadOrder,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
@@ -154,8 +172,8 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                           children: [
                             Text(
                               'Status: ${_pretty(status)}',
-                              style: const TextStyle(
-                                color: Color(0xFF3B1F0A),
+                              style: TextStyle(
+                                color: statusColor,
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -175,6 +193,27 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                                 style: const TextStyle(
                                   color: Color(0xFF6B3A1F),
                                   fontSize: 12,
+                                ),
+                              ),
+                            ],
+                            if (_text(_order['deliveredAt']).isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                'Delivered: ${_formatDate(_text(_order['deliveredAt']))}',
+                                style: const TextStyle(
+                                  color: Color(0xFF6B3A1F),
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                            if (status == 'CANCELLED') ...[
+                              const SizedBox(height: 8),
+                              const Text(
+                                'This order has been cancelled.',
+                                style: TextStyle(
+                                  color: Color(0xFFC62828),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
                             ],
@@ -208,6 +247,9 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                         final isCompleted = step['completed'] as bool;
                         final isActive = step['active'] as bool;
                         final isLast = idx == steps.length - 1;
+                        final stepColor = status == 'CANCELLED' && isActive
+                            ? const Color(0xFFC62828)
+                            : const Color(0xFFD4822A);
 
                         return IntrinsicHeight(
                           child: Row(
@@ -221,12 +263,12 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
                                       color: isCompleted
-                                          ? const Color(0xFFD4822A)
+                                          ? stepColor
                                           : (isActive
-                                              ? const Color(0xFFD4822A).withOpacity(0.3)
+                                              ? stepColor.withOpacity(0.3)
                                               : const Color(0xFFEFE2CC)),
                                       border: isActive
-                                          ? Border.all(color: const Color(0xFFD4822A), width: 2)
+                                          ? Border.all(color: stepColor, width: 2)
                                           : null,
                                     ),
                                     child: isCompleted
@@ -238,7 +280,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                                               decoration: BoxDecoration(
                                                 shape: BoxShape.circle,
                                                 color: isActive
-                                                    ? const Color(0xFFD4822A)
+                                                    ? stepColor
                                                     : const Color(0xFFA0622A),
                                               ),
                                             ),
@@ -249,7 +291,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                                       child: Container(
                                         width: 2,
                                         color: isCompleted
-                                            ? const Color(0xFFD4822A)
+                                            ? stepColor
                                             : const Color(0xFFEFE2CC),
                                       ),
                                     ),
@@ -316,6 +358,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                         ),
                       ),
                     ],
+                  ),
                   ),
                 ),
     );
